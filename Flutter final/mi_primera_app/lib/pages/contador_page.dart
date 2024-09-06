@@ -17,7 +17,7 @@ class _ContadorPageState extends State<ContadorPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Contador con AppBar'),
-        backgroundColor:const Color.fromARGB(244, 185, 185, 46),
+        backgroundColor: const Color.fromARGB(244, 185, 185, 46),
         centerTitle: true,
       ),
       body: Center(
@@ -26,7 +26,8 @@ class _ContadorPageState extends State<ContadorPage> {
           children: [
             Text('Número de clicks:', style: _estiloTexto),
             Text('$_conteo', style: _estiloTexto),
-            ElevatedButton(onPressed: _multiplicar, child: const Text('Multiplicar X 2')),
+            ElevatedButton(
+                onPressed: _multiplicar, child: const Text('Multiplicar X 2')),
           ],
         ),
       ),
@@ -40,36 +41,38 @@ class _ContadorPageState extends State<ContadorPage> {
       children: <Widget>[
         const Expanded(child: EasySizebox(gap: 20)),
         FloatingActionButton(
-          onPressed: _cerar, 
+          onPressed: _cerar,
           child: const Icon(Icons.exposure_zero),
-          backgroundColor:const Color.fromARGB(244, 185, 185, 46),
+          backgroundColor: const Color.fromARGB(244, 185, 185, 46),
         ),
+        SizedBox(height: 10.0),
         FloatingActionButton(
           onPressed: _restar,
           child: const Icon(Icons.remove),
-          backgroundColor:const Color.fromARGB(244, 185, 185, 46),
+          backgroundColor: const Color.fromARGB(244, 185, 185, 46),
         ),
+        SizedBox(height: 10.0),
         FloatingActionButton(
           onPressed: _sumar,
           child: const Icon(Icons.add),
-          backgroundColor:const Color.fromARGB(244, 185, 185, 46),
+          backgroundColor: const Color.fromARGB(244, 185, 185, 46),
         ),
       ],
     );
   }
 
-  void _cerar() {  
+  void _cerar() {
     setState(() {
       _conteo = 0;
     });
   }
 
-  void _restar() { 
-    setState(() { 
-      if (_conteo > 0) { 
-        _conteo--; 
-      } 
-    }); 
+  void _restar() {
+    setState(() {
+      if (_conteo > 0) {
+        _conteo--;
+      }
+    });
   }
 
   void _sumar() {
@@ -78,7 +81,7 @@ class _ContadorPageState extends State<ContadorPage> {
     });
   }
 
-  void _multiplicar(){
+  void _multiplicar() {
     setState(() {
       _conteo *= 2;
     });
