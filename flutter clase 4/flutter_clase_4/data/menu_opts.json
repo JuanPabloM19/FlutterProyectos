@@ -1,0 +1,51 @@
+{
+    "nombreApp" : "Componentes",
+    "rutas" : [
+        {
+            "ruta" : "alert",
+            "icon" : "add_alert",
+            "texto": "Alertas"
+        },
+        {
+            "ruta" : "avatar",
+            "icon" : "accessibility",
+            "texto": "Avatars"
+        },
+        {
+            "ruta" : "card",
+            "icon" : "folder_open",
+            "texto": "Cards - Tarjetas"
+        },
+        {
+            "ruta": "contador",
+            "icon" : "format_number",
+            "texto": "Contador"
+        },
+        {
+            "ruta" : "animated",
+            "icon" : "animated_icon",
+            "texto": "Animacion Container"
+        },
+        {
+            "ruta" : "inputs_txt",
+            "icon" : "inputs",
+            "texto": "Input"
+        },
+        {
+            "ruta" : "practica2",
+            "icon" : "practice_icon",
+            "texto": "Practica 2.0"
+        },
+        {
+            "ruta" : "slider",
+            "icon" : "slideshow_rounded",
+            "texto": "Slider"
+        },
+        {
+            "ruta" : "list",
+            "icon" : "list",
+            "texto": "List"
+        }
+
+    ]
+}
