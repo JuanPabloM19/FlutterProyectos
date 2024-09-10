@@ -45,6 +45,11 @@
             "ruta" : "list",
             "icon" : "list",
             "texto": "List"
+        },
+        {
+            "ruta" : "practica3",
+            "icon" : "privacy_tip_outlined",
+            "texto": "Practica 3.0"
         }
 
     ]

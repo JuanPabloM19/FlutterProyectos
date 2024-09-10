@@ -13,6 +13,7 @@ final _icons = <String, IconData>{
   'practice_icon': Icons.park,
   'slideshow_rounded': Icons.slideshow_rounded,
   'list': Icons.list,
+  'privacy_tip_outlined': Icons.privacy_tip_outlined,
 };
 //Se genera un método que devuelve un icono, recibiendo como parámetro un string con el nombre del mismo
 Icon getIcon(String nombreIcono) {
