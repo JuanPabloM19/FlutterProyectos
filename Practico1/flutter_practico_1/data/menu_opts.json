@@ -1,0 +1,11 @@
+{
+    "nombreApp" : "Practico 1",
+    "rutas" : [
+        {
+            "ruta" : "CAMBIARNOMBRE",
+            "icon" : "warning_amber",
+            "texto": "CAMBIARNOMBRE"
+        }
+
+    ]
+}
