@@ -10,20 +10,26 @@ class EventProvider with ChangeNotifier {
     _loadEvents();
   }
 
+  // Método para obtener eventos de un día específico
   List<Event> getEventsForDay(DateTime day) {
-    return _events[day] ?? [];
+    DateTime dateOnly = DateTime(day.year, day.month, day.day);
+    return _events[dateOnly] ?? [];
   }
 
+  // Método para agregar un evento
   void addEvent(DateTime day, Event event) {
-    if (_events[day] != null) {
-      _events[day]!.add(event);
+    DateTime dateOnly = DateTime(day.year, day.month, day.day);
+
+    if (_events[dateOnly] != null) {
+      _events[dateOnly]!.add(event);
     } else {
-      _events[day] = [event];
+      _events[dateOnly] = [event];
     }
-    _saveEvents();
-    notifyListeners();
+    _saveEvents(); // Guardar eventos en SharedPreferences
+    notifyListeners(); // Notificar a los listeners para que se actualicen
   }
 
+  // Método para guardar eventos en SharedPreferences
   void _saveEvents() async {
     final prefs = await SharedPreferences.getInstance();
     final eventsMap = _events.map((key, value) {
@@ -32,6 +38,7 @@ class EventProvider with ChangeNotifier {
     prefs.setString('events', json.encode(eventsMap));
   }
 
+  // Método para cargar eventos de SharedPreferences
   void _loadEvents() async {
     final prefs = await SharedPreferences.getInstance();
     final eventsString = prefs.getString('events');
@@ -44,7 +51,12 @@ class EventProvider with ChangeNotifier {
         );
         _events[date] = eventsList;
       });
-      notifyListeners();
+      notifyListeners(); // Notificar a los listeners después de cargar
     }
+  }
+
+  // Método público para cargar eventos
+  void loadEvents() {
+    _loadEvents();
   }
 }

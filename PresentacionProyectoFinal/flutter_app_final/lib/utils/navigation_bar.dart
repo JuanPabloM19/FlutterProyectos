@@ -22,7 +22,11 @@ class _MainPageState extends State<MainPage> {
     return Scaffold(
       body: _pages[_currentPageIndex],
       bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Color(0xFF21283F), // Color de fondo del Navigation Bar
         currentIndex: _currentPageIndex,
+        selectedItemColor: Color(0xFF80B3FF), // Color de selección
+        unselectedItemColor: Color(0xFFEBEBF5)
+            .withOpacity(0.6), // Color de íconos no seleccionados
         onTap: (int index) {
           setState(() {
             _currentPageIndex = index;
@@ -31,15 +35,15 @@ class _MainPageState extends State<MainPage> {
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
             icon: Icon(Icons.today),
-            label: 'Today',
+            label: 'Calendario',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.cloud),
-            label: 'Weather',
+            label: 'Clima',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
-            label: 'Settings',
+            label: 'Ajustes',
           ),
         ],
       ),

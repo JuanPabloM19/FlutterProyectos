@@ -11,9 +11,13 @@ class WeatherPage extends StatelessWidget {
       create: (_) => WeatherProvider(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Weather App'),
+          automaticallyImplyLeading: false,
+          title: Center(child: const Text('Clima')),
+          backgroundColor: Color(0xFF010618), // Fondo del AppBar
+          foregroundColor: Colors.white, // Color del texto del AppBar
         ),
-        body: Padding(
+        body: Container(
+          color: Color(0xFF010618), // Fondo de la página
           padding: const EdgeInsets.all(16.0),
           child: Consumer<WeatherProvider>(
             builder: (context, weatherProvider, child) {
@@ -24,26 +28,46 @@ class WeatherPage extends StatelessWidget {
                     controller: _cityController,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(),
-                      labelText: 'Enter city',
+                      labelText: 'Ingrese la ciudad',
+                      labelStyle: TextStyle(
+                          color: Colors.white), // Color de la etiqueta
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                            color: Colors
+                                .white), // Color del borde cuando está enfocado
+                      ),
                     ),
+                    style: TextStyle(
+                        color: Colors.white), // Color del texto del TextField
                     onChanged: (value) {
                       if (value.isNotEmpty) {
                         weatherProvider.searchCities(value);
                       }
                     },
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   weatherProvider.isLoading
-                      ? CircularProgressIndicator()
+                      ? const CircularProgressIndicator()
                       : weatherProvider.cityList == null
-                          ? const Text('No cities found')
+                          ? const Text(
+                              'No se encontraron ciudades',
+                              style: TextStyle(
+                                  color: Colors.white), // Color del texto
+                            )
                           : DropdownButton<String>(
-                              hint: const Text('Select city'),
+                              hint: const Text(
+                                'Seleccione la ciudad',
+                                style: TextStyle(
+                                    color: Colors.white), // Color del texto
+                              ),
                               items: weatherProvider.cityList!.map((city) {
                                 return DropdownMenuItem<String>(
                                   value: city['id'].toString(),
                                   child: Text(
-                                      '${city['name']}, ${city['sys']['country']}'),
+                                      '${city['name']}, ${city['sys']['country']}',
+                                      style: TextStyle(
+                                          color:
+                                              Colors.white)), // Color del texto
                                 );
                               }).toList(),
                               onChanged: (value) {
@@ -51,27 +75,44 @@ class WeatherPage extends StatelessWidget {
                                   weatherProvider.getWeather(value);
                                 }
                               },
+                              dropdownColor: Color(
+                                  0xFF21283F), // Color de fondo del dropdown
                             ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   weatherProvider.isLoading
-                      ? CircularProgressIndicator()
+                      ? const CircularProgressIndicator()
                       : weatherProvider.weatherData == null
                           ? const Text(
-                              'Enter a city to get weather information')
+                              'Introduzca una ciudad para obtener información meteorológica',
+                              style: TextStyle(
+                                  color: Colors.white), // Color del texto
+                            )
                           : Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  'City: ${weatherProvider.weatherData!.city}',
-                                  style: TextStyle(fontSize: 20),
+                                  'Ciudad: ${weatherProvider.weatherData!.city}',
+                                  style: const TextStyle(
+                                      fontSize: 20,
+                                      color: Colors.white), // Color del texto
                                 ),
                                 Text(
-                                  'Temperature: ${weatherProvider.weatherData!.temperature}°C',
-                                  style: TextStyle(fontSize: 20),
+                                  'Temperatura: ${weatherProvider.weatherData!.temperature}°C',
+                                  style: const TextStyle(
+                                      fontSize: 20,
+                                      color: Colors.white), // Color del texto
                                 ),
                                 Text(
-                                  'Weather: ${weatherProvider.weatherData!.description}',
-                                  style: TextStyle(fontSize: 20),
+                                  'Clima: ${weatherProvider.weatherData!.description}',
+                                  style: const TextStyle(
+                                      fontSize: 20,
+                                      color: Colors.white), // Color del texto
+                                ),
+                                // Mostrar el ícono del clima
+                                Image.network(
+                                  'https://openweathermap.org/img/wn/${weatherProvider.weatherData!.icon}@2x.png',
+                                  width: 100,
+                                  height: 100,
                                 ),
                               ],
                             ),

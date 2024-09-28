@@ -31,15 +31,15 @@ class _MainPageState extends State<MainPage> {
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
             icon: Icon(Icons.today),
-            label: 'Today',
+            label: 'Calendario',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.cloud),
-            label: 'Weather',
+            label: 'Clima',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
-            label: 'Settings',
+            label: 'Ajustes',
           ),
         ],
       ),

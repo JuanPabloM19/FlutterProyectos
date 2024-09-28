@@ -6,6 +6,7 @@ class Event {
   final TimeOfDay startTime;
   final TimeOfDay endTime;
   final String equipment;
+  final DateTime date; // Añadir la propiedad date
 
   Event({
     required this.title,
@@ -13,6 +14,7 @@ class Event {
     required this.startTime,
     required this.endTime,
     required this.equipment,
+    required this.date, // Asignar date en el constructor
   });
 
   Map<String, dynamic> toJson() {
@@ -22,6 +24,7 @@ class Event {
       'startTime': '${startTime.hour}:${startTime.minute}',
       'endTime': '${endTime.hour}:${endTime.minute}',
       'equipment': equipment,
+      'date': date.toIso8601String(), // Añadir date al método toJson
     };
   }
 
@@ -41,6 +44,7 @@ class Event {
         minute: int.parse(endTimeParts[1]),
       ),
       equipment: json['equipment'],
+      date: DateTime.parse(json['date']), // Añadir date en el método fromJson
     );
   }
 }
