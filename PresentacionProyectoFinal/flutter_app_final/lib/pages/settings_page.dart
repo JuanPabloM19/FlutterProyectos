@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:provider/provider.dart';
 import '../providers/event_provider.dart';
 
 class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final userProvider =
+        Provider.of<UserProvider>(context); // Obtener el UserProvid
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -22,7 +25,7 @@ class SettingsPage extends StatelessWidget {
                 color: Colors.transparent, // Hacer el Card transparente
                 child: Column(
                   children: [
-                    ListTile(
+                    const ListTile(
                       title: Text(
                         'Datos personales',
                         style: TextStyle(
@@ -33,22 +36,22 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ),
                     ListTile(
-                      leading: Icon(Icons.person,
+                      leading: const Icon(Icons.person,
                           color: Colors.white), // Icono de nombre
                       title: Text(
-                        'Sr Ejemplo',
-                        style: TextStyle(
+                        userProvider.name, // Mostrar el nombre del usuario
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18, // Tamaño de texto aumentado
                         ),
                       ),
                     ),
                     ListTile(
-                      leading: Icon(Icons.email,
+                      leading: const Icon(Icons.email,
                           color: Colors.white), // Icono de correo
                       title: Text(
-                        'srejemplo123@gmail.com',
-                        style: TextStyle(
+                        userProvider.email, // Mostrar el correo del usuario
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18, // Tamaño de texto aumentado
                         ),

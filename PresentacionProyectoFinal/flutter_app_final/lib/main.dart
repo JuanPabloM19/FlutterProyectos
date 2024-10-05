@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
+import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:flutter_app_final/routes/routes.dart';
 import 'package:flutter_app_final/providers/weather_provider.dart';
 import 'package:provider/provider.dart';
@@ -18,9 +19,9 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => WeatherProvider()),
+        ChangeNotifierProvider(create: (context) => EventProvider()),
         ChangeNotifierProvider(
-            create: (context) =>
-                EventProvider()), // Añade tu EventProvider aquí
+            create: (context) => UserProvider()), // Añade tu EventProvider aquí
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
