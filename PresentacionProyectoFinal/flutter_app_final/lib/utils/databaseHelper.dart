@@ -65,6 +65,20 @@ class DatabaseHelper {
     return await db.query('users');
   }
 
+  // Obtén un usuario por su ID
+  Future<Map<String, dynamic>?> getUserById(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> results = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (results.isNotEmpty) {
+      return results.first;
+    }
+    return null;
+  }
+
   // Actualiza un usuario
   Future<int> updateUser(Map<String, dynamic> user) async {
     final db = await database;
@@ -86,6 +100,7 @@ class DatabaseHelper {
     );
   }
 
+  // Obtén un usuario por correo y contraseña
   Future<List<Map<String, dynamic>>> getUserByEmailAndPassword(
       String email, String password) async {
     final db = await database;

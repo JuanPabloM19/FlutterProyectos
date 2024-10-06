@@ -4,59 +4,103 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/event_model.dart';
 
 class EventProvider with ChangeNotifier {
-  final Map<DateTime, List<Event>> _events = {};
+  final Map<String, Map<DateTime, List<Event>>> _userEvents =
+      {}; // Eventos por usuario
 
   EventProvider() {
     _loadEvents();
   }
 
-  // Método para obtener eventos de un día específico
-  List<Event> getEventsForDay(DateTime day) {
+  // Obtener eventos de un día específico para el usuario logueado
+  List<Event> getEventsForDay(DateTime day, String userId) {
     DateTime dateOnly = DateTime(day.year, day.month, day.day);
-    return _events[dateOnly] ?? [];
+    if (_userEvents[userId] != null && _userEvents[userId]![dateOnly] != null) {
+      return _userEvents[userId]![dateOnly]!;
+    }
+    return [];
   }
 
-  // Método para agregar un evento
-  void addEvent(DateTime day, Event event) {
-    DateTime dateOnly = DateTime(day.year, day.month, day.day);
+  // Método para agregar un evento para el usuario logueado
+  void addEvent(Event event) {
+    final userId = event.userId;
+    final dateOnly =
+        DateTime(event.date.year, event.date.month, event.date.day);
 
-    if (_events[dateOnly] != null) {
-      _events[dateOnly]!.add(event);
-    } else {
-      _events[dateOnly] = [event];
+    if (_userEvents[userId] == null) {
+      _userEvents[userId] = {};
     }
-    _saveEvents(); // Guardar eventos en SharedPreferences
-    notifyListeners(); // Notificar a los listeners para que se actualicen
+
+    if (_userEvents[userId]![dateOnly] == null) {
+      _userEvents[userId]![dateOnly] = [];
+    }
+
+    _userEvents[userId]![dateOnly]!.add(event);
+
+    // Guardar los eventos en SharedPreferences
+    _saveEvents(userId);
+    notifyListeners();
+  }
+
+  // Método para eliminar un evento
+  void deleteEvent(DateTime date, Event event) {
+    final userId = event.userId;
+    DateTime dateOnly = DateTime(date.year, date.month, date.day);
+    if (_userEvents[userId] != null && _userEvents[userId]![dateOnly] != null) {
+      _userEvents[userId]![dateOnly]!.remove(event);
+      if (_userEvents[userId]![dateOnly]!.isEmpty) {
+        _userEvents[userId]!.remove(dateOnly);
+      }
+      _saveEvents(userId);
+      notifyListeners();
+    }
+  }
+
+  // Método para editar un evento
+  void editEvent(
+      DateTime oldDate, Event oldEvent, DateTime newDate, Event newEvent) {
+    deleteEvent(oldDate, oldEvent);
+    // Asegúrate de que el newEvent tenga la fecha correcta
+    newEvent.date = newDate; // Actualiza la fecha del evento
+    addEvent(newEvent); // Llama a addEvent solo con newEvent
   }
 
   // Método para guardar eventos en SharedPreferences
-  void _saveEvents() async {
-    final prefs = await SharedPreferences.getInstance();
-    final eventsMap = _events.map((key, value) {
-      return MapEntry(key.toString(), value.map((e) => e.toJson()).toList());
+  void _saveEvents(String userId) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    Map<String, dynamic> eventsMap = {};
+
+    _userEvents[userId]?.forEach((key, value) {
+      eventsMap[key.toIso8601String()] = value
+          .map((e) => jsonDecode(e.toJson()))
+          .toList(); // Cambiado a jsonDecode
     });
-    prefs.setString('events', json.encode(eventsMap));
+
+    await prefs.setString('events_$userId', jsonEncode(eventsMap));
   }
 
   // Método para cargar eventos de SharedPreferences
   void _loadEvents() async {
-    final prefs = await SharedPreferences.getInstance();
-    final eventsString = prefs.getString('events');
-    if (eventsString != null) {
-      final Map<String, dynamic> decodedEvents = json.decode(eventsString);
-      decodedEvents.forEach((key, value) {
-        final DateTime date = DateTime.parse(key);
-        final List<Event> eventsList = List<Event>.from(
-          value.map((e) => Event.fromJson(e)),
-        );
-        _events[date] = eventsList;
-      });
-      notifyListeners(); // Notificar a los listeners después de cargar
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? userId = prefs.getString('userId');
+
+    if (userId != null) {
+      String? eventsJson = prefs.getString('events_$userId');
+      if (eventsJson != null) {
+        Map<String, dynamic> eventsMap = jsonDecode(eventsJson);
+        _userEvents[userId] = {};
+
+        eventsMap.forEach((key, value) {
+          DateTime date = DateTime.parse(key);
+          _userEvents[userId]![date] =
+              (value as List).map((e) => Event.fromJson(e)).toList();
+        });
+      }
     }
   }
 
   // Método público para cargar eventos
   void loadEvents() {
     _loadEvents();
+    notifyListeners();
   }
 }

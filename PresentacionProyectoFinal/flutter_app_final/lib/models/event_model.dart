@@ -1,50 +1,54 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 class Event {
-  final String title;
-  final Color color;
-  final TimeOfDay startTime;
-  final TimeOfDay endTime;
-  final String equipment;
-  final DateTime date; // Añadir la propiedad date
+  String title;
+  DateTime date; // Cambiado a DateTime
+  TimeOfDay startTime;
+  TimeOfDay endTime;
+  Color color;
+  String userId;
+  String equipment;
+  final String data; // Campo adicional
 
   Event({
     required this.title,
-    required this.color,
+    required this.date, // Asegúrate de pasar un DateTime
     required this.startTime,
     required this.endTime,
-    required this.equipment,
-    required this.date, // Asignar date en el constructor
+    required this.color,
+    this.userId = '',
+    this.equipment = '',
+    required this.data, // Requerido
   });
 
-  Map<String, dynamic> toJson() {
-    return {
+  String toJson() {
+    return jsonEncode({
       'title': title,
-      'color': color.value,
+      'date': date.toIso8601String(), // Asegúrate de convertir a string
       'startTime': '${startTime.hour}:${startTime.minute}',
       'endTime': '${endTime.hour}:${endTime.minute}',
+      'color': color.value,
+      'userId': userId,
       'equipment': equipment,
-      'date': date.toIso8601String(), // Añadir date al método toJson
-    };
+      'data': data, // Incluye 'data'
+    });
   }
 
-  static Event fromJson(Map<String, dynamic> json) {
-    final startTimeParts = json['startTime'].split(':');
-    final endTimeParts = json['endTime'].split(':');
-
+  factory Event.fromJson(Map<String, dynamic> json) {
     return Event(
       title: json['title'],
-      color: Color(json['color']),
+      date: DateTime.parse(json['date']),
       startTime: TimeOfDay(
-        hour: int.parse(startTimeParts[0]),
-        minute: int.parse(startTimeParts[1]),
-      ),
+          hour: int.parse(json['startTime'].split(':')[0]),
+          minute: int.parse(json['startTime'].split(':')[1])),
       endTime: TimeOfDay(
-        hour: int.parse(endTimeParts[0]),
-        minute: int.parse(endTimeParts[1]),
-      ),
+          hour: int.parse(json['endTime'].split(':')[0]),
+          minute: int.parse(json['endTime'].split(':')[1])),
+      color: Color(json['color']),
+      userId: json['userId'],
       equipment: json['equipment'],
-      date: DateTime.parse(json['date']), // Añadir date en el método fromJson
+      data: json['data'], // Incluye 'data'
     );
   }
 }

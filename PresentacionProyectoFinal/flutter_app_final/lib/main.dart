@@ -4,7 +4,7 @@ import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:flutter_app_final/routes/routes.dart';
 import 'package:flutter_app_final/providers/weather_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/date_symbol_data_local.dart'; // Importar esta biblioteca
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() {
   initializeDateFormatting().then((_) {
@@ -14,14 +14,14 @@ void main() {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => WeatherProvider()),
         ChangeNotifierProvider(create: (context) => EventProvider()),
-        ChangeNotifierProvider(
-            create: (context) => UserProvider()), // Añade tu EventProvider aquí
+        ChangeNotifierProvider(create: (context) => UserProvider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

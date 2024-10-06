@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app_final/pages/today_page.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:flutter_app_final/utils/databaseHelper.dart';
 import 'package:flutter_app_final/utils/navigation_bar.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -36,19 +36,14 @@ class _InputPageState extends State<LoginPage> {
           padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 50.0),
           children: [
             _crearEmail(),
-            const Divider(
-              color: Colors.transparent,
-              height: 30.0,
-            ),
+            const Divider(color: Colors.transparent, height: 30.0),
             _crearPassword(),
-            const SizedBox(
-              height: 400.0,
-            ),
+            const SizedBox(height: 400.0),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  _login(context); // Llama al método de login
+                  _login(context);
                 },
                 style: ButtonStyle(
                   backgroundColor:
@@ -64,9 +59,7 @@ class _InputPageState extends State<LoginPage> {
                 ),
                 child: const Text(
                   'Iniciar Sesión',
-                  style: TextStyle(
-                    fontSize: 15.0,
-                  ),
+                  style: TextStyle(fontSize: 15.0),
                 ),
               ),
             ),
@@ -138,19 +131,22 @@ class _InputPageState extends State<LoginPage> {
         await dbHelper.getUserByEmailAndPassword(_email, _password);
 
     if (user.isNotEmpty) {
-      // Login exitoso
-      String name =
-          user[0]['name']; // Asegúrate de que el nombre esté en el mapa
-      String email =
-          user[0]['email']; // Asegúrate de que el correo esté en el mapa
+      String name = user[0]['name'];
+      String email = user[0]['email'];
+      String userId =
+          user[0]['id'].toString(); // Asegúrate de que el ID esté en el mapa
 
       // Cargar datos del usuario en el UserProvider
       Provider.of<UserProvider>(context, listen: false)
-          .loadUserData(name, email, user[0]['id'].toString());
+          .loadUserData(name, email, userId);
+
+      // Almacenar el ID del usuario en SharedPreferences
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          'userId', userId); // Guarda el ID en SharedPreferences
 
       _showSuccessDialog(context);
     } else {
-      // Login fallido
       _showErrorDialog(context);
     }
   }
@@ -187,12 +183,10 @@ class _InputPageState extends State<LoginPage> {
   void _showSuccessDialog(BuildContext context) {
     showDialog(
       context: context,
-      barrierDismissible:
-          false, // Evita que el diálogo se cierre al hacer clic fuera
+      barrierDismissible: false,
       builder: (BuildContext context) {
         Future.delayed(const Duration(seconds: 4), () {
-          Navigator.of(context)
-              .pop(); // Cierra el diálogo después de 4 segundos
+          Navigator.of(context).pop();
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => MainPage()),
@@ -207,16 +201,7 @@ class _InputPageState extends State<LoginPage> {
               Text("Éxito"),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min, // Ajusta el tamaño al contenido
-            crossAxisAlignment:
-                CrossAxisAlignment.start, // Alinea los textos a la izquierda
-            children: [
-              Text("Inicio de sesión exitoso"),
-              SizedBox(height: 10), // Espacio entre los textos
-              Text("Por favor espere...")
-            ],
-          ),
+          content: Text("Inicio de sesión exitoso. Redirigiendo..."),
         );
       },
     );

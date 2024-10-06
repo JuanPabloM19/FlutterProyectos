@@ -16,4 +16,15 @@ class UserProvider with ChangeNotifier {
   String get name => _name;
   String get email => _email;
   String get userId => _userId; // Getter para userId
+
+  bool isLoggedIn() {
+    return _userId.isNotEmpty; // Cambiado para comprobar el userId
+  }
+
+  void logout() {
+    _name = 'Nombre Desconocido';
+    _email = 'Correo Desconocido';
+    _userId = '0';
+    notifyListeners();
+  }
 }

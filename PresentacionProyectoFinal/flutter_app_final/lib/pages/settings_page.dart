@@ -6,8 +6,8 @@ import '../providers/event_provider.dart';
 class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final userProvider =
-        Provider.of<UserProvider>(context); // Obtener el UserProvid
+    final userProvider = Provider.of<UserProvider>(context);
+    final userId = userProvider.userId;
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -78,8 +78,8 @@ class SettingsPage extends StatelessWidget {
                       ),
                       subtitle: Consumer<EventProvider>(
                         builder: (context, eventProvider, child) {
-                          final eventsToday =
-                              eventProvider.getEventsForDay(DateTime.now());
+                          final eventsToday = eventProvider.getEventsForDay(
+                              DateTime.now(), userId);
                           if (eventsToday.isNotEmpty) {
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
