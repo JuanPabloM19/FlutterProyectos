@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app_final/models/equipment_model.dart';
 import 'package:flutter_app_final/models/event_model.dart';
+import 'package:flutter_app_final/providers/equipment_provider.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
+import 'package:flutter_app_final/utils/equipmentWidget.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -226,11 +229,13 @@ class _CalendarPageState extends State<CalendarPage> {
 
   void _addEvent(BuildContext context) async {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
+    final equipmentProvider =
+        Provider.of<EquipmentProvider>(context, listen: false);
     final TextEditingController controller = TextEditingController();
     Color selectedColor = Colors.blue;
     TimeOfDay? startTime;
     TimeOfDay? endTime;
-    String? selectedEquipment;
+    Equipment? selectedEquipment;
 
     final userId = await _getUserId();
 
@@ -243,12 +248,8 @@ class _CalendarPageState extends State<CalendarPage> {
       return;
     }
 
-    final List<String> equipmentList = [
-      'GPS SOUTH',
-      'GPS HEMISPHERE',
-      'GPS SANDING',
-      'ESTACIÓN TOTAL',
-    ];
+    await equipmentProvider.fetchEquipments();
+    await eventProvider.fetchEvents();
 
     showDialog(
       context: context,
@@ -262,72 +263,98 @@ class _CalendarPageState extends State<CalendarPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
-                      controller: controller,
-                      decoration:
-                          const InputDecoration(hintText: 'Título Evento'),
-                      style: const TextStyle(color: Colors.black87)),
-                  const SizedBox(height: 8.0),
-                  DropdownButton<Color>(
-                    value: selectedColor,
-                    items: const [
-                      DropdownMenuItem(
-                        value: Colors.blue,
-                        child:
-                            Text('Azul', style: TextStyle(color: Colors.blue)),
-                      ),
-                      DropdownMenuItem(
-                        value: Colors.red,
-                        child:
-                            Text('Rojo', style: TextStyle(color: Colors.red)),
-                      ),
-                      DropdownMenuItem(
-                        value: Colors.green,
-                        child: Text('Verde',
-                            style: TextStyle(color: Colors.green)),
-                      ),
-                    ],
-                    onChanged: (Color? value) {
-                      if (value != null) {
-                        setState(() {
-                          selectedColor = value;
-                        });
-                      }
-                    },
+                    controller: controller,
+                    decoration:
+                        const InputDecoration(hintText: 'Título Evento'),
+                    style: const TextStyle(color: Colors.black87),
                   ),
                   const SizedBox(height: 8.0),
-                  TextButton(
-                    onPressed: () async {
-                      startTime = await showTimePicker(
-                          context: context, initialTime: TimeOfDay.now());
-                    },
-                    child: const Text('Seleccionar Hora Inicio',
-                        style: TextStyle(color: Colors.black87)),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      endTime = await showTimePicker(
-                          context: context, initialTime: TimeOfDay.now());
-                    },
-                    child: const Text(
-                      'Seleccionar Hora Fin',
-                      style: TextStyle(color: Colors.black87),
+                  Container(
+                    width: 200,
+                    child: DropdownButton<Color>(
+                      isExpanded: true,
+                      value: selectedColor,
+                      items: const [
+                        DropdownMenuItem(
+                          value: Colors.blue,
+                          child: Text('Azul',
+                              style:
+                                  TextStyle(color: Colors.blue, fontSize: 14)),
+                        ),
+                        DropdownMenuItem(
+                          value: Colors.red,
+                          child: Text('Rojo',
+                              style:
+                                  TextStyle(color: Colors.red, fontSize: 14)),
+                        ),
+                        DropdownMenuItem(
+                          value: Colors.green,
+                          child: Text('Verde',
+                              style:
+                                  TextStyle(color: Colors.green, fontSize: 14)),
+                        ),
+                      ],
+                      onChanged: (Color? value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedColor = value;
+                          });
+                        }
+                      },
                     ),
                   ),
                   const SizedBox(height: 8.0),
-                  DropdownButton<String>(
-                    hint: const Text('Seleccionar Equipo'),
-                    value: selectedEquipment,
-                    items: equipmentList.map((String equipment) {
-                      return DropdownMenuItem(
-                        value: equipment,
-                        child: Text(equipment),
+                  TextButton(
+                    onPressed: () async {
+                      final selectedStartTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
                       );
-                    }).toList(),
-                    onChanged: (String? value) {
+                      if (selectedStartTime != null) {
+                        setState(() {
+                          startTime = selectedStartTime;
+                        });
+                      }
+                    },
+                    child: Text(
+                      startTime == null
+                          ? 'Seleccionar Hora Inicio'
+                          : 'Hora Inicio: ${startTime!.format(context)}',
+                      style: const TextStyle(color: Colors.black87),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      final selectedEndTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (selectedEndTime != null) {
+                        setState(() {
+                          endTime = selectedEndTime;
+                        });
+                      }
+                    },
+                    child: Text(
+                      endTime == null
+                          ? 'Seleccionar Hora Fin'
+                          : 'Hora Fin: ${endTime!.format(context)}',
+                      style: const TextStyle(color: Colors.black87),
+                    ),
+                  ),
+                  const SizedBox(height: 8.0),
+                  EquipmentWidget(
+                    selectedEquipment: selectedEquipment,
+                    equipmentList: equipmentProvider.equipmentList,
+                    onChanged: (Equipment? equipment) {
                       setState(() {
-                        selectedEquipment = value;
+                        selectedEquipment = equipment;
                       });
                     },
+                    selectedDate: _selectedDay ?? _focusedDay,
+                    userId: userId,
+                    startTime: startTime ?? TimeOfDay.now(),
+                    endTime: endTime ?? TimeOfDay.now(),
                   ),
                 ],
               ),
@@ -343,25 +370,68 @@ class _CalendarPageState extends State<CalendarPage> {
                     style: TextStyle(color: Colors.green)),
                 onPressed: () {
                   final title = controller.text;
-                  if (title.isNotEmpty &&
-                      startTime != null &&
-                      endTime != null &&
-                      selectedEquipment != null) {
-                    eventProvider.addEvent(Event(
-                      title: controller.text,
-                      date: _selectedDay ?? _focusedDay,
-                      startTime: startTime!,
-                      endTime: endTime!,
-                      color: selectedColor,
-                      equipment: selectedEquipment!,
-                      userId:
-                          userId, // Si este campo ya no es necesario, puedes eliminarlo
-                      data: 'Your additional data', // Por defecto
-                    ));
+                  if (title.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            'Por favor, ingresa un título para el evento.'),
+                      ),
+                    );
+                    return;
+                  }
+                  if (startTime == null || endTime == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            'Por favor, selecciona la hora de inicio y fin.'),
+                      ),
+                    );
+                    return;
+                  }
+                  if (selectedEquipment == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Por favor, selecciona un equipo.'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  final isAvailable = eventProvider.isTeamAvailable(
+                    selectedEquipment!.nameE,
+                    _selectedDay ?? _focusedDay,
+                    startTime!,
+                    endTime!,
+                  );
+
+                  if (!isAvailable) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            'El equipo ya está reservado en esta fecha y hora.'),
+                      ),
+                    );
+                  } else {
+                    // Agregar el evento aquí
+                    eventProvider.addEvent(
+                      context,
+                      Event(
+                        title: title,
+                        date: _selectedDay ?? _focusedDay,
+                        startTime: startTime!,
+                        endTime: endTime!,
+                        color: selectedColor,
+                        equipment: selectedEquipment!.nameE,
+                        userId: userId,
+                        data:
+                            'Your additional data', // Cambia según sea necesario
+                      ),
+                    );
+
                     Navigator.of(context).pop();
                   }
                 },
-              )
+              ),
             ],
           );
         },

@@ -1,41 +1,40 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 
 class Event {
   String title;
-  DateTime date; // Cambiado a DateTime
+  DateTime date;
   TimeOfDay startTime;
   TimeOfDay endTime;
   Color color;
   String userId;
   String equipment;
-  final String data; // Campo adicional
+  String data; // Puedes agregar más información
 
   Event({
     required this.title,
-    required this.date, // Asegúrate de pasar un DateTime
+    required this.date,
     required this.startTime,
     required this.endTime,
     required this.color,
-    this.userId = '',
-    this.equipment = '',
-    required this.data, // Requerido
+    required this.userId,
+    required this.equipment,
+    this.data = '',
   });
 
-  String toJson() {
-    return jsonEncode({
+  Map<String, dynamic> toJson(BuildContext context) {
+    return {
       'title': title,
-      'date': date.toIso8601String(), // Asegúrate de convertir a string
-      'startTime': '${startTime.hour}:${startTime.minute}',
-      'endTime': '${endTime.hour}:${endTime.minute}',
+      'date': date.toIso8601String(),
+      'startTime': startTime.format(context),
+      'endTime': endTime.format(context),
       'color': color.value,
       'userId': userId,
       'equipment': equipment,
-      'data': data, // Incluye 'data'
-    });
+      'data': data,
+    };
   }
 
-  factory Event.fromJson(Map<String, dynamic> json) {
+  static Event fromJson(Map<String, dynamic> json) {
     return Event(
       title: json['title'],
       date: DateTime.parse(json['date']),
@@ -48,7 +47,7 @@ class Event {
       color: Color(json['color']),
       userId: json['userId'],
       equipment: json['equipment'],
-      data: json['data'], // Incluye 'data'
+      data: json['data'],
     );
   }
 }
