@@ -1,7 +1,12 @@
 class User {
-  final String userId; // Agrega userId
+  final String userId;
   final String name;
   final String email;
+  final bool isAdmin; // Agregar si es administrador
 
-  User({required this.userId, required this.name, required this.email});
+  User(
+      {required this.userId,
+      required this.name,
+      required this.email,
+      required this.isAdmin});
 }

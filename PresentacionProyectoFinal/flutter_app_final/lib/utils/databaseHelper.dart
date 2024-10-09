@@ -20,10 +20,10 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'app_database2.db');
+    String path = join(await getDatabasesPath(), 'app_database3.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
     );
   }
@@ -34,7 +34,8 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         email TEXT,
-        password TEXT
+        password TEXT,
+        isAdmin INTEGER DEFAULT 0 -- Agregado campo isAdmin
       )
     ''');
 
@@ -43,6 +44,19 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nameE TEXT,
         reservedDates TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        equipmentId INTEGER,
+        userId INTEGER,
+        date TEXT,
+        startTime TEXT,
+        endTime TEXT,
+        FOREIGN KEY (equipmentId) REFERENCES equipment(id),
+        FOREIGN KEY (userId) REFERENCES users(id)
       )
     ''');
 
@@ -73,11 +87,19 @@ class DatabaseHelper {
       'name': 'Joaquin Riera',
       'email': 'joariera@gmail.com',
       'password': 'password1',
+      'isAdmin': 1 // Asignar como administrador
     });
     await db.insert('users', {
       'name': 'Alejandro Munizaga',
       'email': 'munizagaroger@gmail.com',
       'password': 'password2',
+      'isAdmin': 0
+    });
+    await db.insert('users', {
+      'name': 'Juan Pablo Munizaga',
+      'email': 'jpmuni@gmail.com',
+      'password': 'password3',
+      'isAdmin': 0
     });
   }
 
@@ -261,5 +283,36 @@ class DatabaseHelper {
       where: 'email = ? AND password = ?',
       whereArgs: [email, password],
     );
+  }
+
+  // Obtener los detalles del equipo alquilado por ID de equipo
+  Future<Map<String, dynamic>?> getEquipmentById(int equipmentId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> results = await db.query(
+      'equipment',
+      where: 'id = ?',
+      whereArgs: [equipmentId],
+    );
+    if (results.isNotEmpty) {
+      return results.first;
+    }
+    return null;
+  }
+
+  // Obtener todas las reservas de todos los usuarios
+  Future<List<Map<String, dynamic>>> getAllReservations() async {
+    final db = await database;
+    return await db.query('events');
+  }
+
+  // Obtener si el usuario es administrador
+  Future<bool> isAdmin(String userId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> result = await db.query(
+      'users',
+      where: 'id = ? AND isAdmin = 1',
+      whereArgs: [userId],
+    );
+    return result.isNotEmpty;
   }
 }

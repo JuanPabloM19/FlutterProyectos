@@ -50,4 +50,23 @@ class Event {
       data: json['data'],
     );
   }
+
+  static Event fromMap(Map<String, dynamic> map) {
+    return Event(
+      title: map['title'],
+      date: DateTime.parse(map['date']),
+      startTime: TimeOfDay(
+        hour: int.parse(map['startTime'].split(':')[0]),
+        minute: int.parse(map['startTime'].split(':')[1]),
+      ),
+      endTime: TimeOfDay(
+        hour: int.parse(map['endTime'].split(':')[0]),
+        minute: int.parse(map['endTime'].split(':')[1]),
+      ),
+      color: Color(map['color']),
+      userId: map['userId'],
+      equipment: map['equipment'],
+      data: map['data'],
+    );
+  }
 }

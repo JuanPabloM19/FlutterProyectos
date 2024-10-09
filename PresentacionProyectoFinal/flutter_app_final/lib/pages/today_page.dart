@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/equipment_model.dart';
 import 'package:flutter_app_final/models/event_model.dart';
+import 'package:flutter_app_final/models/user_model.dart';
 import 'package:flutter_app_final/providers/equipment_provider.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
+import 'package:flutter_app_final/providers/user_provider.dart';
+import 'package:flutter_app_final/utils/databaseHelper.dart';
 import 'package:flutter_app_final/utils/equipmentWidget.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,11 +34,23 @@ class CalendarPage extends StatefulWidget {
 class _CalendarPageState extends State<CalendarPage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  bool isAdmin = false;
+  String? _userId;
 
   @override
   void initState() {
     super.initState();
-    _selectedDay = DateTime.now(); // Inicializa _selectedDay con hoy
+    _selectedDay = DateTime.now();
+    _loadAdminStatus();
+    _loadUserId();
+    // Inicializa _selectedDay con hoy
+  }
+
+  Future<void> _loadAdminStatus() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      isAdmin = prefs.getString('email') == 'joariera@gmail.com';
+    });
   }
 
   @override
@@ -66,11 +81,16 @@ class _CalendarPageState extends State<CalendarPage> {
                 });
               },
               eventLoader: (day) {
-                final userId = _getUserIdSync();
-                if (userId != null) {
-                  return eventProvider.getEventsForDay(day, userId);
+                final userProvider =
+                    Provider.of<UserProvider>(context, listen: false);
+
+                if (userProvider.isAdmin) {
+                  return eventProvider.getAllEventsForDay(
+                      day); // Para el admin, obtener todos los eventos
+                } else {
+                  return eventProvider.getEventsForDay(day,
+                      _userId ?? ""); // Usar el _userId cargado en el estado
                 }
-                return [];
               },
               calendarBuilders: CalendarBuilders(
                 dowBuilder: (context, day) {
@@ -105,13 +125,20 @@ class _CalendarPageState extends State<CalendarPage> {
                   if (eventCount > 0) {
                     List<Widget> markers = [];
                     for (int i = 0; i < eventCount && i < 3; i++) {
+                      Color markerColor = events[i].color;
+
+                      // Aplicar un color específico para el admin
+                      if (isAdmin) {
+                        markerColor = events[i].color.withOpacity(0.8);
+                      }
+
                       markers.add(
                         Container(
                           margin: const EdgeInsets.symmetric(horizontal: 1.0),
                           width: 6.0,
                           height: 6.0,
                           decoration: BoxDecoration(
-                            color: events[i].color,
+                            color: markerColor,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -137,18 +164,42 @@ class _CalendarPageState extends State<CalendarPage> {
                   return const SizedBox.shrink();
                 },
               ),
+              calendarStyle: CalendarStyle(
+                defaultTextStyle: const TextStyle(color: Colors.white),
+                weekendTextStyle: const TextStyle(color: Colors.white),
+                todayTextStyle: const TextStyle(color: Colors.white),
+                selectedTextStyle: const TextStyle(color: Colors.black),
+                todayDecoration: BoxDecoration(
+                  color: Colors.blueGrey,
+                  shape: BoxShape.circle,
+                ),
+                // Cambiar el color de los días alquilados para el admin
+                defaultDecoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                ),
+                markerDecoration: BoxDecoration(
+                  color: Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                withinRangeDecoration: BoxDecoration(
+                  border: Border.all(color: Colors.blue, width: 2),
+                  shape: BoxShape.circle,
+                ),
+                outsideDecoration: BoxDecoration(
+                  color: Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                holidayDecoration: BoxDecoration(
+                  color: Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+              ),
               headerStyle: const HeaderStyle(
                 formatButtonVisible: false,
                 titleCentered: true,
                 leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
                 rightChevronIcon:
                     Icon(Icons.chevron_right, color: Colors.white),
-              ),
-              calendarStyle: const CalendarStyle(
-                defaultTextStyle: TextStyle(color: Colors.white),
-                weekendTextStyle: TextStyle(color: Colors.white),
-                todayTextStyle: TextStyle(color: Colors.white),
-                selectedTextStyle: TextStyle(color: Colors.black),
               ),
             ),
             const SizedBox(height: 8.0),
@@ -196,6 +247,56 @@ class _CalendarPageState extends State<CalendarPage> {
                 },
               ),
             ),
+            // Mostrar los días alquilados si es el administrador
+            if (isAdmin)
+              Expanded(
+                child: FutureBuilder<List<Event>>(
+                  future: Provider.of<EventProvider>(context, listen: false)
+                      .getAllEvents(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No hay días alquilados.',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }
+
+                    final allEvents = snapshot.data!;
+
+                    return ListView.builder(
+                      itemCount: allEvents.length,
+                      itemBuilder: (context, index) {
+                        final event = allEvents[index];
+                        return Container(
+                          margin: const EdgeInsets.symmetric(vertical: 4.0),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.green, width: 2),
+                            borderRadius: BorderRadius.circular(8),
+                            color: event.color.withOpacity(
+                                0.3), // Cambia el color de fondo según la reserva
+                          ),
+                          child: ListTile(
+                            title: Text(
+                              'Alquilado: ${event.title}',
+                              style: const TextStyle(color: Colors.green),
+                            ),
+                            subtitle: Text(
+                              'Usuario: ${event.userId}\nEquipo: ${event.equipment}',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
           ],
         ),
       ),
@@ -439,11 +540,10 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
-  String? _getUserIdSync() {
-    // Método para obtener el ID del usuario sincrónicamente
-    SharedPreferences.getInstance().then((prefs) {
-      return prefs.getString('userId');
+  Future<void> _loadUserId() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userId = prefs.getString('userId');
     });
-    return null;
   }
 }

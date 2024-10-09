@@ -131,14 +131,13 @@ class _InputPageState extends State<LoginPage> {
         await dbHelper.getUserByEmailAndPassword(_email, _password);
 
     if (user.isNotEmpty) {
-      String name = user[0]['name'];
       String email = user[0]['email'];
-      String userId =
-          user[0]['id'].toString(); // Asegúrate de que el ID esté en el mapa
+      String userId = user[0]['id'].toString();
+      bool isAdmin = user[0]['isAdmin'] == 1; // Obtener el estado de isAdmin
 
       // Cargar datos del usuario en el UserProvider
       Provider.of<UserProvider>(context, listen: false)
-          .loadUserData(name, email, userId);
+          .loadUserData(email, _password); // Solo pasas email y password
 
       // Almacenar el ID del usuario en SharedPreferences
       SharedPreferences prefs = await SharedPreferences.getInstance();

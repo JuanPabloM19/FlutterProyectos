@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_app_final/utils/databaseHelper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:table_calendar/table_calendar.dart';
 import '../models/event_model.dart';
 
 class EventProvider with ChangeNotifier {
@@ -17,6 +19,21 @@ class EventProvider with ChangeNotifier {
   List<Event> getEventsForDay(DateTime day, String userId) {
     DateTime dateOnly = DateTime(day.year, day.month, day.day);
     return _userEvents[userId]?[dateOnly] ?? [];
+  }
+
+  // Obtener todos los eventos para un día específico
+// Obtener todos los eventos para un día específico
+  List<Event> getAllEventsForDay(DateTime day) {
+    List<Event> allEventsForDay = [];
+    List<Event> allEvents = getAlEvents(); // Obtener todos los eventos
+
+    for (var event in allEvents) {
+      if (isSameDay(event.date, day)) {
+        allEventsForDay.add(event);
+      }
+    }
+
+    return allEventsForDay;
   }
 
   List<Event> get events {
@@ -229,5 +246,25 @@ class EventProvider with ChangeNotifier {
     await _loadEvents(); // Asegúrate de esperar a que se carguen los eventos
     await _loadOccupiedTeams(); // También cargar equipos ocupados
     notifyListeners();
+  }
+
+  Future<List<Event>> getAllEvents() async {
+    final List<Map<String, dynamic>> data =
+        await DatabaseHelper().getAllReservations();
+    return data
+        .map((eventMap) => Event.fromJson(eventMap))
+        .toList(); // Asegúrate de que el método sea fromJson
+  }
+
+  // Obtener todos los eventos
+// Obtener todos los eventos
+  List<Event> getAlEvents() {
+    List<Event> allEvents = [];
+    _userEvents.forEach((userId, userEventMap) {
+      userEventMap.forEach((date, eventList) {
+        allEvents.addAll(eventList);
+      });
+    });
+    return allEvents;
   }
 }
