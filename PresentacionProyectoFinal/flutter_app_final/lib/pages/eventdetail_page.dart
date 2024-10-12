@@ -8,6 +8,35 @@ class EventDetailPage extends StatelessWidget {
 
   const EventDetailPage({super.key, required this.event});
 
+  void _showReportDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Informe del Evento'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Título: ${event.title}'),
+              Text('Fecha: ${event.date.toLocal().toString().split(' ')[0]}'),
+              Text('Hora Inicio: ${event.startTime.format(context)}'),
+              Text('Hora Fin: ${event.endTime.format(context)}'),
+              // Agrega aquí más información que quieras mostrar
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Cerrar el dialog
+              },
+              child: const Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -75,6 +104,14 @@ class EventDetailPage extends StatelessWidget {
                   style: const TextStyle(color: Colors.white),
                 );
               },
+            ),
+            const SizedBox(height: 16.0),
+            // Botón para generar el informe
+            ElevatedButton(
+              onPressed: () {
+                _showReportDialog(context);
+              },
+              child: const Text('Generar Informe'),
             ),
           ],
         ),
