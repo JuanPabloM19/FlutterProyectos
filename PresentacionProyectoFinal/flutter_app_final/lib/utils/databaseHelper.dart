@@ -20,10 +20,10 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'app_database3.db');
+    String path = join(await getDatabasesPath(), 'app_database5.db');
     return await openDatabase(
       path,
-      version: 3,
+      version: 5,
       onCreate: _onCreate,
     );
   }
@@ -52,6 +52,8 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         equipmentId INTEGER,
         userId INTEGER,
+        nameE TEXT,
+        name TEXT,
         date TEXT,
         startTime TEXT,
         endTime TEXT,
@@ -314,5 +316,59 @@ class DatabaseHelper {
       whereArgs: [userId],
     );
     return result.isNotEmpty;
+  }
+
+  // Obtener el nombre de usuario por ID
+// Obtener el nombre de usuario por ID
+  Future<String> getUserName(int userId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> result = await db.query(
+      'users',
+      columns: ['name'],
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+
+    if (result.isNotEmpty) {
+      return result.first['name'] as String;
+    }
+    return 'Usuario no encontrado'; // Proporcionar un valor por defecto
+  }
+
+  Future<List<Map<String, dynamic>>> fetchEventsWithUserDetails(
+      String date) async {
+    final db = await database;
+    final List<Map<String, dynamic>> results = await db.rawQuery('''
+    SELECT users.name AS userName, equipment.nameE AS equipmentName, events.date
+    FROM events
+    JOIN users ON events.userId = users.id
+    JOIN equipment ON events.equipmentId = equipment.id
+    WHERE events.date = ?
+  ''', [date]);
+    return results;
+  }
+
+  Future<List<Map<String, dynamic>>> getUserDetailsByReservationDate(
+      String date) async {
+    final db = await database;
+
+    print('Buscando detalles para la fecha: $date'); // Añadir este print
+
+    final List<Map<String, dynamic>> results = await db.rawQuery('''
+  SELECT users.name, equipment.nameE, events.date, events.startTime, events.endTime
+  FROM events
+  JOIN users ON events.userId = users.id
+  JOIN equipment ON events.equipmentId = equipment.id
+  WHERE events.date = ?''', [date]);
+
+    print('Resultados de la consulta: $results'); // Imprimir los resultados
+
+    return results;
+  }
+
+  // Agrega este método para obtener todos los usuarios
+  Future<List<Map<String, dynamic>>> getAllUsers() async {
+    final db = await database;
+    return await db.query('users');
   }
 }

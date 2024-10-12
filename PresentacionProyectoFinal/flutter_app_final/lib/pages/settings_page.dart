@@ -3,26 +3,43 @@ import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:provider/provider.dart';
 import '../providers/event_provider.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
+  @override
+  _SettingsPageState createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  @override
+  void initState() {
+    super.initState();
+
+    // Cargar los usuarios cuando se inicializa la pantalla
+    Provider.of<UserProvider>(context, listen: false).loadAllUsers();
+  }
+
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
+    final eventProvider = Provider.of<EventProvider>(context);
     final userId = userProvider.userId;
+    final isAdmin = userProvider
+        .isAdmin; // Asegúrate de tener un método para comprobar si el usuario es admin
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Center(child: Text('Ajustes')),
-        backgroundColor: Color(0xFF010618), // Fondo del AppBar
+        backgroundColor: Color(0xFF010618),
         foregroundColor: Colors.white,
       ),
       body: Container(
-        color: Color(0xFF010618), // Fondo de la pantalla
+        color: Color(0xFF010618),
         child: ListView(
           children: [
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Card(
-                color: Colors.transparent, // Hacer el Card transparente
+                color: Colors.transparent,
                 child: Column(
                   children: [
                     const ListTile(
@@ -30,30 +47,28 @@ class SettingsPage extends StatelessWidget {
                         'Datos personales',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 24, // Tamaño de texto aumentado
-                          fontWeight: FontWeight.bold, // Negrita
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                     ListTile(
-                      leading: const Icon(Icons.person,
-                          color: Colors.white), // Icono de nombre
+                      leading: const Icon(Icons.person, color: Colors.white),
                       title: Text(
-                        userProvider.name, // Mostrar el nombre del usuario
+                        userProvider.name,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 18, // Tamaño de texto aumentado
+                          fontSize: 18,
                         ),
                       ),
                     ),
                     ListTile(
-                      leading: const Icon(Icons.email,
-                          color: Colors.white), // Icono de correo
+                      leading: const Icon(Icons.email, color: Colors.white),
                       title: Text(
-                        userProvider.email, // Mostrar el correo del usuario
+                        userProvider.email,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 18, // Tamaño de texto aumentado
+                          fontSize: 18,
                         ),
                       ),
                     ),
@@ -64,7 +79,7 @@ class SettingsPage extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Card(
-                color: Colors.transparent, // Hacer el Card transparente
+                color: Colors.transparent,
                 child: Column(
                   children: [
                     ListTile(
@@ -72,18 +87,27 @@ class SettingsPage extends StatelessWidget {
                         'Eventos del día',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 24, // Tamaño de texto aumentado
-                          fontWeight: FontWeight.bold, // Negrita
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       subtitle: Consumer<EventProvider>(
                         builder: (context, eventProvider, child) {
-                          final eventsToday = eventProvider.getEventsForDay(
-                              DateTime.now(), userId);
+                          final eventsToday = isAdmin
+                              ? eventProvider.getAllEventsForDay(DateTime.now())
+                              : eventProvider.getEventsForDay(
+                                  DateTime.now(), userId);
+
                           if (eventsToday.isNotEmpty) {
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: eventsToday.map((event) {
+                                // Obtén el nombre del usuario utilizando el UserProvider
+                                final userName = Provider.of<UserProvider>(
+                                        context,
+                                        listen: false)
+                                    .getUserNameById(event.userId);
+
                                 return Padding(
                                   padding:
                                       const EdgeInsets.symmetric(vertical: 4.0),
@@ -97,17 +121,13 @@ class SettingsPage extends StatelessWidget {
                                           shape: BoxShape.circle,
                                         ),
                                       ),
-                                      SizedBox(
-                                          width:
-                                              8.0), // Espacio entre el punto y el texto
+                                      SizedBox(width: 8.0),
                                       Expanded(
                                         child: Text(
-                                          "${event.title} - ${event.startTime.format(context)} a ${event.endTime.format(context)}",
+                                          "$userName - ${event.equipment} - ${event.startTime.format(context)} a ${event.endTime.format(context)}",
                                           style: TextStyle(
-                                            fontSize:
-                                                16, // Tamaño de texto aumentado
-                                            color:
-                                                Colors.white, // Texto en blanco
+                                            fontSize: 16,
+                                            color: Colors.white,
                                           ),
                                         ),
                                       ),
@@ -119,15 +139,14 @@ class SettingsPage extends StatelessWidget {
                           } else {
                             return Text(
                               'Hoy no se registraron eventos',
-                              style: TextStyle(
-                                  color: Colors.white), // Texto en blanco
+                              style: TextStyle(color: Colors.white),
                             );
                           }
                         },
                       ),
                     ),
                     const Divider(
-                      color: Colors.transparent, // Cambiado a transparente
+                      color: Colors.transparent,
                       height: 30.0,
                     ),
                     ElevatedButton(
@@ -137,10 +156,8 @@ class SettingsPage extends StatelessWidget {
                             .loadEvents();
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            Color(0xFF80B3FF), // Color de fondo azul claro
-                        foregroundColor:
-                            Color(0xFF010618), // Color del texto negro
+                        backgroundColor: Color(0xFF80B3FF),
+                        foregroundColor: Color(0xFF010618),
                       ),
                       child: Text('Recargar Eventos'),
                     ),

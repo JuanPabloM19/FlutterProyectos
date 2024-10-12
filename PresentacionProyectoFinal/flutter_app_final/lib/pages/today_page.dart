@@ -36,6 +36,8 @@ class _CalendarPageState extends State<CalendarPage> {
   DateTime? _selectedDay;
   bool isAdmin = false;
   String? _userId;
+  String? userName;
+  List<Event>? allEvents;
 
   @override
   void initState() {
@@ -43,7 +45,16 @@ class _CalendarPageState extends State<CalendarPage> {
     _selectedDay = DateTime.now();
     _loadAdminStatus();
     _loadUserId();
-    // Inicializa _selectedDay con hoy
+    _loadUserName();
+    DatabaseHelper();
+    Provider.of<UserProvider>(context, listen: false).loadAllUsers();
+    _loadEvents();
+  }
+
+  Future<void> _loadEvents() async {
+    final eventProvider = Provider.of<EventProvider>(context, listen: false);
+    allEvents = await eventProvider.getAllEvents();
+    setState(() {}); // Actualiza el estado después de cargar los eventos
   }
 
   Future<void> _loadAdminStatus() async {
@@ -51,6 +62,24 @@ class _CalendarPageState extends State<CalendarPage> {
     setState(() {
       isAdmin = prefs.getString('email') == 'joariera@gmail.com';
     });
+  }
+
+  // Método para cargar el nombre de usuario
+  Future<void> _loadUserName() async {
+    if (_userId != null) {
+      String? name = await DatabaseHelper().getUserName(int.parse(_userId!));
+      setState(() {
+        userName = name;
+      });
+    }
+  }
+
+  Future<Map<String, dynamic>?> _getUserDetails(DateTime date) async {
+    final results = await DatabaseHelper()
+        .getUserDetailsByReservationDate(DateFormat('yyyy-MM-dd').format(date));
+    return results.isNotEmpty
+        ? results.first
+        : null; // Devuelve el primer elemento o null
   }
 
   @override
@@ -173,7 +202,6 @@ class _CalendarPageState extends State<CalendarPage> {
                   color: Colors.blueGrey,
                   shape: BoxShape.circle,
                 ),
-                // Cambiar el color de los días alquilados para el admin
                 defaultDecoration: BoxDecoration(
                   shape: BoxShape.circle,
                 ),
@@ -268,7 +296,6 @@ class _CalendarPageState extends State<CalendarPage> {
                     }
 
                     final allEvents = snapshot.data!;
-
                     return ListView.builder(
                       itemCount: allEvents.length,
                       itemBuilder: (context, index) {
@@ -278,17 +305,54 @@ class _CalendarPageState extends State<CalendarPage> {
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.green, width: 2),
                             borderRadius: BorderRadius.circular(8),
-                            color: event.color.withOpacity(
-                                0.3), // Cambia el color de fondo según la reserva
+                            color: event.color.withOpacity(0.3),
                           ),
                           child: ListTile(
                             title: Text(
                               'Alquilado: ${event.title}',
                               style: const TextStyle(color: Colors.green),
                             ),
-                            subtitle: Text(
-                              'Usuario: ${event.userId}\nEquipo: ${event.equipment}',
-                              style: const TextStyle(color: Colors.white),
+                            subtitle: FutureBuilder<List<Map<String, dynamic>>>(
+                              future: DatabaseHelper()
+                                  .getUserDetailsByReservationDate(
+                                      DateFormat('yyyy-MM-dd')
+                                          .format(event.date)),
+                              builder: (context, userSnapshot) {
+                                if (userSnapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Text(
+                                    'Cargando usuario...',
+                                    style: TextStyle(color: Colors.white),
+                                  );
+                                } else if (userSnapshot.hasError) {
+                                  return const Text(
+                                    'Error al cargar usuario',
+                                    style: TextStyle(color: Colors.white),
+                                  );
+                                } else if (!userSnapshot.hasData ||
+                                    userSnapshot.data!.isEmpty) {
+                                  return const Text(
+                                    'No se encontró información',
+                                    style: TextStyle(color: Colors.white),
+                                  );
+                                }
+
+                                // Obtener detalles del primer usuario de la lista
+                                final userDetails = userSnapshot.data!.first;
+                                final userName = userDetails['name'] ??
+                                    'Usuario no encontrado';
+                                final equipmentName = userDetails['nameE'] ??
+                                    'Equipo no encontrado';
+
+                                return Text(
+                                  'Usuario: $userName\n'
+                                  'Equipo: $equipmentName\n'
+                                  'Fecha: ${event.date.toLocal().toString().split(' ')[0]}\n' // Formato de fecha
+                                  'Hora Inicio: ${event.startTime.format(context)}\n'
+                                  'Hora Fin: ${event.endTime.format(context)}',
+                                  style: const TextStyle(color: Colors.white),
+                                );
+                              },
                             ),
                           ),
                         );
@@ -545,5 +609,6 @@ class _CalendarPageState extends State<CalendarPage> {
     setState(() {
       _userId = prefs.getString('userId');
     });
+    _loadUserName();
   }
 }
