@@ -3,13 +3,13 @@ import 'package:flutter_app_final/models/equipment_model.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:provider/provider.dart';
 
-class EquipmentWidget extends StatelessWidget {
+class EquipmentWidget extends StatefulWidget {
   final Equipment? selectedEquipment;
   final List<Equipment> equipmentList;
   final Function(Equipment?) onChanged;
   final DateTime selectedDate;
   final TimeOfDay startTime;
-  final TimeOfDay endTime; // Added to account for time range
+  final TimeOfDay endTime;
   final String userId;
 
   EquipmentWidget({
@@ -23,44 +23,60 @@ class EquipmentWidget extends StatelessWidget {
   });
 
   @override
+  _EquipmentWidgetState createState() => _EquipmentWidgetState();
+}
+
+class _EquipmentWidgetState extends State<EquipmentWidget> {
+  late Equipment? _currentSelectedEquipment;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSelectedEquipment = widget.selectedEquipment;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final eventProvider = Provider.of<EventProvider>(context);
 
     return Container(
-      padding:
-          EdgeInsets.symmetric(horizontal: 16), // Added padding for spacing
+      padding: EdgeInsets.symmetric(horizontal: 16),
       child: DropdownButton<Equipment>(
-        value: selectedEquipment,
-        isExpanded: true, // Ensure dropdown expands to fit content
-        items: equipmentList.map((equipment) {
+        value: _currentSelectedEquipment, // Usa el valor del estado local
+        isExpanded: true,
+        items: widget.equipmentList.map((equipment) {
           bool isAvailable = eventProvider.isTeamAvailable(
             equipment.nameE,
-            selectedDate,
-            startTime, // Passing start time
-            endTime, // Passing end time
+            widget.selectedDate,
+            widget.startTime,
+            widget.endTime,
           );
 
           return DropdownMenuItem<Equipment>(
             value: equipment,
             child: Text(
               equipment.nameE,
-              overflow: TextOverflow.ellipsis, // Handle long text with ellipsis
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: isAvailable ? Colors.black : Colors.grey,
               ),
             ),
-            enabled: isAvailable, // Enable/Disable based on availability
+            enabled: isAvailable,
           );
         }).toList(),
         onChanged: (Equipment? equipment) {
           if (equipment != null &&
               eventProvider.isTeamAvailable(
                 equipment.nameE,
-                selectedDate,
-                startTime,
-                endTime,
+                widget.selectedDate,
+                widget.startTime,
+                widget.endTime,
               )) {
-            onChanged(equipment); // Notify only if available
+            setState(() {
+              _currentSelectedEquipment =
+                  equipment; // Actualiza el estado local
+            });
+            widget.onChanged(equipment); // Notifica el cambio
           }
         },
         icon: Icon(Icons.arrow_drop_down, color: Colors.black),

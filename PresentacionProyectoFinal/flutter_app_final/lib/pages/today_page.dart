@@ -363,11 +363,12 @@ class _CalendarPageState extends State<CalendarPage> {
     await equipmentProvider.fetchEquipments();
     List<Equipment> equipmentList = equipmentProvider.equipmentList;
 
-    Equipment selectedEquipment = equipmentList.firstWhere(
+    // Aquí permitimos que selectedEquipment sea nullable
+    Equipment? selectedEquipment = equipmentList.firstWhere(
       (e) => e.nameE == event.equipment,
       orElse: () {
         throw Exception('Equipo no encontrado');
-      },
+      }, // Cambiamos a null en caso de no encontrar el equipo
     );
 
     String eventType = event.title;
@@ -377,63 +378,70 @@ class _CalendarPageState extends State<CalendarPage> {
       builder: (context) => AlertDialog(
         title: const Text('Editar Evento'),
         content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButton<String>(
-                value: eventType,
-                items: const [
-                  DropdownMenuItem(value: 'Préstamo', child: Text('Préstamo')),
-                  DropdownMenuItem(value: 'Alquiler', child: Text('Alquiler')),
-                ],
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    eventType = newValue;
-                  }
-                },
-              ),
-              EquipmentWidget(
-                selectedEquipment: selectedEquipment,
-                equipmentList: equipmentList,
-                onChanged: (equipment) {
-                  selectedEquipment = equipment!;
-                },
-                selectedDate: event.date,
-                startTime: startTime,
-                endTime: endTime,
-                userId: event.userId,
-              ),
-              ListTile(
-                title: const Text('Hora de Inicio'),
-                trailing: Text(startTime.format(context)),
-                onTap: () async {
-                  final TimeOfDay? newTime = await showTimePicker(
-                    context: context,
-                    initialTime: startTime,
-                  );
-                  if (newTime != null) {
-                    startTime = newTime;
-                  }
-                },
-              ),
-              ListTile(
-                title: const Text('Hora de Fin'),
-                trailing: Text(endTime.format(context)),
-                onTap: () async {
-                  final TimeOfDay? newTime = await showTimePicker(
-                    context: context,
-                    initialTime: endTime,
-                  );
-                  if (newTime != null) {
-                    endTime = newTime;
-                  }
-                },
-              ),
-            ],
+          child: Container(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButton<String>(
+                  value: eventType,
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'Préstamo', child: Text('Préstamo')),
+                    DropdownMenuItem(
+                        value: 'Alquiler', child: Text('Alquiler')),
+                  ],
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      eventType = newValue;
+                    }
+                  },
+                ),
+                EquipmentWidget(
+                  selectedEquipment: selectedEquipment, // Permitir null
+                  equipmentList: equipmentList,
+                  onChanged: (equipment) {
+                    if (equipment != null) {
+                      selectedEquipment =
+                          equipment; // Actualiza el equipo seleccionado
+                    }
+                  },
+                  selectedDate: event.date,
+                  startTime: startTime,
+                  endTime: endTime,
+                  userId: event.userId,
+                ),
+                ListTile(
+                  title: const Text('Hora de Inicio'),
+                  trailing: Text(startTime.format(context)),
+                  onTap: () async {
+                    final TimeOfDay? newTime = await showTimePicker(
+                      context: context,
+                      initialTime: startTime,
+                    );
+                    if (newTime != null) {
+                      startTime = newTime;
+                    }
+                  },
+                ),
+                ListTile(
+                  title: const Text('Hora de Fin'),
+                  trailing: Text(endTime.format(context)),
+                  onTap: () async {
+                    final TimeOfDay? newTime = await showTimePicker(
+                      context: context,
+                      initialTime: endTime,
+                    );
+                    if (newTime != null) {
+                      endTime = newTime;
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
-          // Botón Cancelar
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Color(0xFF80B3FF),
@@ -442,13 +450,11 @@ class _CalendarPageState extends State<CalendarPage> {
             child: const Text('Cancelar'),
             onPressed: () => Navigator.pop(context),
           ),
-          // Botón Actualizar
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Color.fromARGB(255, 1, 170, 15),
               foregroundColor: Colors.white,
-              textStyle:
-                  const TextStyle(fontWeight: FontWeight.bold), // Negrita
+              textStyle: const TextStyle(fontWeight: FontWeight.bold),
             ),
             child: const Text('Actualizar'),
             onPressed: () {
@@ -462,7 +468,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
               Event updatedEvent = event.copyWith(
                 title: eventType,
-                equipment: selectedEquipment.nameE,
+                equipment: selectedEquipment!.nameE, // Desempacar seguro
                 startTime: startTime,
                 endTime: endTime,
               );
