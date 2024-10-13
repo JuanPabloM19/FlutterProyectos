@@ -42,6 +42,9 @@ class _CalendarPageState extends State<CalendarPage> {
   DateTime _selectedDate =
       DateTime.now(); // Variable para almacenar la fecha seleccionada
 
+  // Variable para guardar los eventos del día seleccionado
+  List<Event> _selectedEvents = [];
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +77,8 @@ class _CalendarPageState extends State<CalendarPage> {
   @override
   Widget build(BuildContext context) {
     final eventProvider = Provider.of<EventProvider>(context);
+    final userProvider = Provider.of<UserProvider>(context);
+    final isAdmin = userProvider.isAdmin;
 
     return Scaffold(
       appBar: AppBar(
@@ -96,6 +101,7 @@ class _CalendarPageState extends State<CalendarPage> {
                 _selectedDay = selectedDay;
                 _focusedDay = focusedDay;
                 _selectedDate = selectedDay;
+                _loadSelectedEvents();
               });
             },
             eventLoader: (day) {
@@ -222,7 +228,8 @@ class _CalendarPageState extends State<CalendarPage> {
           const SizedBox(height: 8.0),
           Expanded(
             child: FutureBuilder<List<Event>>(
-              future: _getEventsForSelectedDay(eventProvider),
+              future: _getEventsForSelectedDay(
+                  eventProvider), // Pasar el eventProvider
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -230,13 +237,16 @@ class _CalendarPageState extends State<CalendarPage> {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return const Center(
-                      child: Text(
-                    'No hay eventos para hoy.',
-                    style: TextStyle(color: Colors.white),
-                  ));
+                    child: Text(
+                      'No hay eventos para hoy.',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  );
                 }
 
                 final events = snapshot.data!;
+                _selectedEvents = events; // Guardar eventos seleccionados
+
                 return ListView.builder(
                   itemCount: events.length,
                   itemBuilder: (context, index) {
@@ -251,12 +261,29 @@ class _CalendarPageState extends State<CalendarPage> {
                         ),
                       ),
                       title: Text(
-                        event.title,
+                        event.equipment,
                         style: const TextStyle(color: Colors.white),
                       ),
                       subtitle: Text(
                         '${event.startTime.format(context)} - ${event.endTime.format(context)}',
                         style: const TextStyle(color: Colors.white),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.white),
+                            onPressed: () {
+                              _editEvent(context, event);
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {
+                              _deleteEvent(event);
+                            },
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -264,21 +291,45 @@ class _CalendarPageState extends State<CalendarPage> {
               },
             ),
           ),
-          // Mostrar los días alquilados si es el administrador
         ]),
       ),
-      floatingActionButton: Opacity(
-        opacity: 0.8,
-        child: FloatingActionButton(
-          backgroundColor: const Color(0xFF80B3FF),
-          child: const Icon(
-            Icons.add,
-            color: Color(0xFF010618),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // Botón para agregar eventos
+          FloatingActionButton(
+            onPressed: () => _addEvent(context), // Lógica para agregar evento
+            backgroundColor: const Color(0xFF80B3FF),
+            child: const Icon(
+              Icons.add,
+              color: Color(0xFF010618),
+            ),
           ),
-          onPressed: () => _addEvent(context),
-        ),
+          const SizedBox(height: 16),
+          // Botón para regresar al listado de alquileres, visible solo para admin
+          if (isAdmin)
+            FloatingActionButton(
+              onPressed: () {
+                Navigator.pop(context); // Regresar al listado de alquileres
+              },
+              backgroundColor: const Color(0xFF80B3FF),
+              child: const Icon(
+                Icons.arrow_back,
+                color: Color(0xFF010618),
+              ),
+            ),
+        ],
       ),
     );
+  }
+
+  // Cargar eventos para el día seleccionado
+  void _loadSelectedEvents() async {
+    final eventProvider = Provider.of<EventProvider>(context, listen: false);
+    final events = await _getEventsForSelectedDay(eventProvider);
+    setState(() {
+      _selectedEvents = events; // Actualiza la lista de eventos seleccionados
+    });
   }
 
   Future<String?> _getUserId() async {
@@ -300,11 +351,181 @@ class _CalendarPageState extends State<CalendarPage> {
     } // Devuelve una lista vacía si el usuario no está logueado o no hay día seleccionado
   }
 
+  void _editEvent(BuildContext context, Event event) async {
+    final eventProvider = Provider.of<EventProvider>(context, listen: false);
+    final equipmentProvider =
+        Provider.of<EquipmentProvider>(context, listen: false);
+
+    Color selectedColor = event.color;
+    TimeOfDay startTime = event.startTime;
+    TimeOfDay endTime = event.endTime;
+
+    await equipmentProvider.fetchEquipments();
+    List<Equipment> equipmentList = equipmentProvider.equipmentList;
+
+    Equipment selectedEquipment = equipmentList.firstWhere(
+      (e) => e.nameE == event.equipment,
+      orElse: () {
+        throw Exception('Equipo no encontrado');
+      },
+    );
+
+    String eventType = event.title;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Editar Evento'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButton<String>(
+                value: eventType,
+                items: const [
+                  DropdownMenuItem(value: 'Préstamo', child: Text('Préstamo')),
+                  DropdownMenuItem(value: 'Alquiler', child: Text('Alquiler')),
+                ],
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    eventType = newValue;
+                  }
+                },
+              ),
+              EquipmentWidget(
+                selectedEquipment: selectedEquipment,
+                equipmentList: equipmentList,
+                onChanged: (equipment) {
+                  selectedEquipment = equipment!;
+                },
+                selectedDate: event.date,
+                startTime: startTime,
+                endTime: endTime,
+                userId: event.userId,
+              ),
+              ListTile(
+                title: const Text('Hora de Inicio'),
+                trailing: Text(startTime.format(context)),
+                onTap: () async {
+                  final TimeOfDay? newTime = await showTimePicker(
+                    context: context,
+                    initialTime: startTime,
+                  );
+                  if (newTime != null) {
+                    startTime = newTime;
+                  }
+                },
+              ),
+              ListTile(
+                title: const Text('Hora de Fin'),
+                trailing: Text(endTime.format(context)),
+                onTap: () async {
+                  final TimeOfDay? newTime = await showTimePicker(
+                    context: context,
+                    initialTime: endTime,
+                  );
+                  if (newTime != null) {
+                    endTime = newTime;
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          // Botón Cancelar
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF80B3FF),
+              foregroundColor: Color(0xFF010618),
+            ),
+            child: const Text('Cancelar'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          // Botón Actualizar
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color.fromARGB(255, 1, 170, 15),
+              foregroundColor: Colors.white,
+              textStyle:
+                  const TextStyle(fontWeight: FontWeight.bold), // Negrita
+            ),
+            child: const Text('Actualizar'),
+            onPressed: () {
+              if (selectedEquipment == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Por favor, selecciona un equipo.')),
+                );
+                return;
+              }
+
+              Event updatedEvent = event.copyWith(
+                title: eventType,
+                equipment: selectedEquipment.nameE,
+                startTime: startTime,
+                endTime: endTime,
+              );
+
+              eventProvider.editEvent(
+                  context, event.date, event, event.date, updatedEvent);
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+// Método para eliminar un evento
+  void _deleteEvent(Event event) {
+    final eventProvider = Provider.of<EventProvider>(context, listen: false);
+
+    // Mostrar diálogo de confirmación
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Eliminar Evento'),
+          content:
+              const Text('¿Estás seguro de que deseas eliminar este evento?'),
+          actions: <Widget>[
+            // Botón Cancelar
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF80B3FF),
+                foregroundColor: Color(0xFF010618),
+              ),
+              child: const Text('Cancelar'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            // Botón Eliminar
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color.fromARGB(255, 228, 25, 10),
+                foregroundColor: Colors.white,
+                textStyle:
+                    const TextStyle(fontWeight: FontWeight.bold), // Negrita
+              ),
+              child: const Text('Eliminar'),
+              onPressed: () {
+                eventProvider.deleteEvent(context, event.date, event);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Evento eliminado')),
+                );
+                Navigator.of(context).pop(); // Cerrar el diálogo
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _addEvent(BuildContext context) async {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
     final equipmentProvider =
         Provider.of<EquipmentProvider>(context, listen: false);
-    final TextEditingController controller = TextEditingController();
     Color selectedColor = Colors.blue;
     TimeOfDay? startTime;
     TimeOfDay? endTime;
@@ -324,6 +545,9 @@ class _CalendarPageState extends State<CalendarPage> {
     await equipmentProvider.fetchEquipments();
     await eventProvider.fetchEvents();
 
+    // Tipo de evento inicial
+    String eventType = 'Préstamo'; // Valor inicial
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -335,11 +559,21 @@ class _CalendarPageState extends State<CalendarPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(
-                    controller: controller,
-                    decoration:
-                        const InputDecoration(hintText: 'Título Evento'),
-                    style: const TextStyle(color: Colors.black87),
+                  DropdownButton<String>(
+                    value: eventType,
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'Préstamo', child: Text('Préstamo')),
+                      DropdownMenuItem(
+                          value: 'Alquiler', child: Text('Alquiler')),
+                    ],
+                    onChanged: (String? newValue) {
+                      if (newValue != null) {
+                        setState(() {
+                          eventType = newValue; // Actualiza el tipo de evento
+                        });
+                      }
+                    },
                   ),
                   const SizedBox(height: 8.0),
                   Container(
@@ -433,25 +667,23 @@ class _CalendarPageState extends State<CalendarPage> {
               ),
             ),
             actions: [
-              TextButton(
-                child:
-                    const Text('Cancelar', style: TextStyle(color: Colors.red)),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF80B3FF),
+                  foregroundColor: Color(0xFF010618),
+                ),
+                child: const Text('Cancelar'),
                 onPressed: () => Navigator.pop(context),
               ),
-              TextButton(
-                child: const Text('Agregar',
-                    style: TextStyle(color: Colors.green)),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color.fromARGB(255, 1, 170, 15),
+                  foregroundColor: Color.fromARGB(255, 255, 255, 255),
+                ),
+                child: const Text(
+                  'Agregar',
+                ),
                 onPressed: () {
-                  final title = controller.text;
-                  if (title.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            'Por favor, ingresa un título para el evento.'),
-                      ),
-                    );
-                    return;
-                  }
                   if (startTime == null || endTime == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -489,7 +721,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     eventProvider.addEvent(
                       context,
                       Event(
-                        title: title,
+                        title: eventType,
                         date: _selectedDay ?? _focusedDay,
                         startTime: startTime!,
                         endTime: endTime!,

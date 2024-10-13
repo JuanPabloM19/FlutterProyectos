@@ -14,6 +14,7 @@ Map<String, WidgetBuilder> getAplicationRoutes() {
     'settings': (BuildContext context) => SettingsPage(),
     'today': (BuildContext context) => const TodayPage(),
     'wheater': (BuildContext context) => WeatherPage(),
-    'main': (BuildContext context) => MainPage(), // Agrega esta línea
+    'main': (BuildContext context) => MainPage(),
+    'calendar': (BuildContext context) => const CalendarPage(),
   };
 }

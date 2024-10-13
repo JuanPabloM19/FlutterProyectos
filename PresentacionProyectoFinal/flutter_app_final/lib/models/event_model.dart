@@ -21,6 +21,28 @@ class Event {
     this.data = '',
   });
 
+  Event copyWith({
+    String? title,
+    DateTime? date,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    Color? color,
+    String? userId,
+    String? equipment,
+    String? data,
+  }) {
+    return Event(
+      title: title ?? this.title,
+      date: date ?? this.date,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      color: color ?? this.color,
+      userId: userId ?? this.userId,
+      equipment: equipment ?? this.equipment,
+      data: data ?? this.data,
+    );
+  }
+
   Map<String, dynamic> toJson(BuildContext context) {
     return {
       'title': title,

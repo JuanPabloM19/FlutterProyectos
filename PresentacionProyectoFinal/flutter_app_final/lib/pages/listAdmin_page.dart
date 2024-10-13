@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart'; // Asegúrate de agregar esta librería para formatear fechas
+import 'package:intl/intl.dart';
+import 'today_page.dart'; // Asegúrate de que la importación sea correcta
 
 class RentalListPage extends StatefulWidget {
   @override
@@ -10,13 +11,13 @@ class RentalListPage extends StatefulWidget {
 }
 
 class _RentalListPageState extends State<RentalListPage> {
-  bool _isLoading = true; // Estado para controlar la carga
-  String _errorMessage = ''; // Estado para almacenar errores
+  bool _isLoading = true;
+  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    _loadData(); // Cargar los datos cuando se inicia la página
+    _loadData();
   }
 
   Future<void> _loadData() async {
@@ -24,18 +25,17 @@ class _RentalListPageState extends State<RentalListPage> {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
     try {
-      // Cargar eventos y usuarios solo una vez
       await Future.wait([
         eventProvider.fetchEvents(),
         userProvider.loadAllUsers(),
       ]);
       setState(() {
-        _isLoading = false; // Finalizar carga
+        _isLoading = false;
       });
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Error al cargar los datos: $e'; // Manejar errores
+        _errorMessage = 'Error al cargar los datos: $e';
       });
     }
   }
@@ -64,7 +64,7 @@ class _RentalListPageState extends State<RentalListPage> {
 
   Widget _buildRentalList(BuildContext context, EventProvider eventProvider,
       UserProvider userProvider) {
-    final isAdmin = userProvider.isAdmin; // Verifica si es admin
+    final isAdmin = userProvider.isAdmin;
     final List<String> daysOfWeek = [
       'Lunes',
       'Martes',
@@ -86,33 +86,24 @@ class _RentalListPageState extends State<RentalListPage> {
         color: Color(0xFF010618),
         child: ListView(
           children: daysOfWeek.map((day) {
-            // Obtener el número del día en la semana (Lunes = 1, Domingo = 7)
             int dayIndex = daysOfWeek.indexOf(day) + 1;
-
-            // Obtener la fecha de hoy y calcular la fecha correspondiente
             DateTime today = DateTime.now();
             DateTime dayDate = today;
 
-            // Ajustar la fecha para que apunte al día correcto de esta semana o la siguiente
             if (today.weekday > dayIndex) {
-              // Si el día de la semana actual ya pasó, sumar días hasta el mismo día de la próxima semana
               dayDate =
                   today.add(Duration(days: (7 - today.weekday + dayIndex)));
             } else if (today.weekday < dayIndex) {
-              // Si el día de la semana actual no ha llegado, sumar la diferencia para alcanzar el mismo día de esta semana
               dayDate = today.add(Duration(days: (dayIndex - today.weekday)));
             }
 
-            // Formatear el día para que se muestre como "Lunes 14", etc.
             final dayLabel =
                 "${DateFormat('EEEE', 'es').format(dayDate)} ${dayDate.day}";
 
-            // Verificar si es el día actual
             final isToday = dayDate.day == today.day &&
                 dayDate.month == today.month &&
                 dayDate.year == today.year;
 
-            // Obtener eventos del día correspondiente
             final eventsForDay =
                 isAdmin ? eventProvider.getAllEventsForDay(dayDate) : [];
 
@@ -124,9 +115,7 @@ class _RentalListPageState extends State<RentalListPage> {
                   child: Text(
                     dayLabel.toUpperCase(),
                     style: TextStyle(
-                      color: isToday
-                          ? Colors.green
-                          : Colors.white, // Verde si es hoy
+                      color: isToday ? Colors.green : Colors.white,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
@@ -169,13 +158,29 @@ class _RentalListPageState extends State<RentalListPage> {
           }).toList(),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Recargar eventos
-          _loadData();
-        },
-        backgroundColor: Color(0xFF80B3FF),
-        child: Icon(Icons.refresh, color: Color(0xFF010618)),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: () {
+              // Navegar a TodayPage
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CalendarPage()),
+              );
+            },
+            backgroundColor: Color(0xFF80B3FF),
+            child: Icon(Icons.add, color: Color(0xFF010618)),
+          ),
+          SizedBox(height: 16),
+          FloatingActionButton(
+            onPressed: () {
+              _loadData();
+            },
+            backgroundColor: Color(0xFF80B3FF),
+            child: Icon(Icons.refresh, color: Color(0xFF010618)),
+          ),
+        ],
       ),
     );
   }
