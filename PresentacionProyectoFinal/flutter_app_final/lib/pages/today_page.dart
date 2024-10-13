@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/equipment_model.dart';
 import 'package:flutter_app_final/models/event_model.dart';
-import 'package:flutter_app_final/models/user_model.dart';
+import 'package:flutter_app_final/pages/RentalsListPage.dart';
 import 'package:flutter_app_final/providers/equipment_provider.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
@@ -17,9 +17,11 @@ class TodayPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final isAdmin = userProvider.isAdmin;
     return ChangeNotifierProvider(
       create: (_) => EventProvider(),
-      child: const CalendarPage(),
+      child: isAdmin ? RentalListPage() : const CalendarPage(),
     );
   }
 }
@@ -37,6 +39,8 @@ class _CalendarPageState extends State<CalendarPage> {
   bool isAdmin = false;
   String? _userId;
   String? userName;
+  DateTime _selectedDate =
+      DateTime.now(); // Variable para almacenar la fecha seleccionada
 
   @override
   void initState() {
@@ -45,6 +49,8 @@ class _CalendarPageState extends State<CalendarPage> {
     _loadAdminStatus();
     _loadUserId();
     _loadUserName();
+    Provider.of<EventProvider>(context, listen: false).loadEvents();
+
     // Inicializa _selectedDay con hoy
   }
 
@@ -78,258 +84,188 @@ class _CalendarPageState extends State<CalendarPage> {
       ),
       body: Container(
         color: const Color(0xFF010618),
-        child: Column(
-          children: [
-            TableCalendar<Event>(
-              locale: 'es_ES',
-              focusedDay: _focusedDay,
-              firstDay: DateTime.utc(2020, 1, 1),
-              lastDay: DateTime.utc(2030, 12, 31),
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              onDaySelected: (selectedDay, focusedDay) {
-                setState(() {
-                  _selectedDay = selectedDay;
-                  _focusedDay = focusedDay;
-                });
-              },
-              eventLoader: (day) {
-                final userProvider =
-                    Provider.of<UserProvider>(context, listen: false);
+        child: Column(children: [
+          TableCalendar<Event>(
+            locale: 'es_ES',
+            focusedDay: _focusedDay,
+            firstDay: DateTime.utc(2020, 1, 1),
+            lastDay: DateTime.utc(2030, 12, 31),
+            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+            onDaySelected: (selectedDay, focusedDay) {
+              setState(() {
+                _selectedDay = selectedDay;
+                _focusedDay = focusedDay;
+                _selectedDate = selectedDay;
+              });
+            },
+            eventLoader: (day) {
+              final userProvider =
+                  Provider.of<UserProvider>(context, listen: false);
 
-                if (userProvider.isAdmin) {
-                  return eventProvider.getAllEventsForDay(
-                      day); // Para el admin, obtener todos los eventos
-                } else {
-                  return eventProvider.getEventsForDay(day,
-                      _userId ?? ""); // Usar el _userId cargado en el estado
-                }
-              },
-              calendarBuilders: CalendarBuilders(
-                dowBuilder: (context, day) {
-                  final text = DateFormat.E('es_ES').format(day).toUpperCase();
-                  return Center(
-                    child: Text(
-                      text,
-                      style: const TextStyle(
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+              if (userProvider.isAdmin) {
+                return eventProvider.getAllEventsForDay(
+                    day); // Para el admin, obtener todos los eventos
+              } else {
+                return eventProvider.getEventsForDay(
+                    day, _userId ?? ""); // Usar el _userId cargado en el estado
+              }
+            },
+            calendarBuilders: CalendarBuilders(
+              dowBuilder: (context, day) {
+                final text = DateFormat.E('es_ES').format(day).toUpperCase();
+                return Center(
+                  child: Text(
+                    text,
+                    style: const TextStyle(
+                      fontSize: 14.0,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
-                  );
-                },
-                headerTitleBuilder: (context, day) {
-                  final text =
-                      DateFormat.yMMMM('es_ES').format(day).toUpperCase();
-                  return Center(
-                    child: Text(
-                      text,
-                      style: const TextStyle(
-                        fontSize: 20.0,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                  ),
+                );
+              },
+              headerTitleBuilder: (context, day) {
+                final text =
+                    DateFormat.yMMMM('es_ES').format(day).toUpperCase();
+                return Center(
+                  child: Text(
+                    text,
+                    style: const TextStyle(
+                      fontSize: 20.0,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
-                  );
-                },
-                markerBuilder: (context, day, events) {
-                  final eventCount = events.length;
-                  if (eventCount > 0) {
-                    List<Widget> markers = [];
-                    for (int i = 0; i < eventCount && i < 3; i++) {
-                      Color markerColor = events[i].color;
+                  ),
+                );
+              },
+              markerBuilder: (context, day, events) {
+                final eventCount = events.length;
+                if (eventCount > 0) {
+                  List<Widget> markers = [];
+                  for (int i = 0; i < eventCount && i < 3; i++) {
+                    Color markerColor = events[i].color;
 
-                      // Aplicar un color específico para el admin
-                      if (isAdmin) {
-                        markerColor = events[i].color.withOpacity(0.8);
-                      }
+                    // Aplicar un color específico para el admin
+                    if (isAdmin) {
+                      markerColor = events[i].color.withOpacity(0.8);
+                    }
 
-                      markers.add(
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 1.0),
-                          width: 6.0,
-                          height: 6.0,
-                          decoration: BoxDecoration(
-                            color: markerColor,
-                            shape: BoxShape.circle,
-                          ),
+                    markers.add(
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 1.0),
+                        width: 6.0,
+                        height: 6.0,
+                        decoration: BoxDecoration(
+                          color: markerColor,
+                          shape: BoxShape.circle,
                         ),
-                      );
-                    }
-                    if (eventCount > 3) {
-                      markers.add(
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 1.0),
-                          child: Text(
-                            '+${eventCount - 3}',
-                            style: const TextStyle(
-                                fontSize: 12.0, color: Colors.white),
-                          ),
-                        ),
-                      );
-                    }
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: markers,
+                      ),
                     );
                   }
-                  return const SizedBox.shrink();
-                },
-              ),
-              calendarStyle: CalendarStyle(
-                defaultTextStyle: const TextStyle(color: Colors.white),
-                weekendTextStyle: const TextStyle(color: Colors.white),
-                todayTextStyle: const TextStyle(color: Colors.white),
-                selectedTextStyle: const TextStyle(color: Colors.black),
-                todayDecoration: BoxDecoration(
-                  color: Colors.blueGrey,
-                  shape: BoxShape.circle,
-                ),
-                // Cambiar el color de los días alquilados para el admin
-                defaultDecoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                ),
-                markerDecoration: BoxDecoration(
-                  color: Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-                withinRangeDecoration: BoxDecoration(
-                  border: Border.all(color: Colors.blue, width: 2),
-                  shape: BoxShape.circle,
-                ),
-                outsideDecoration: BoxDecoration(
-                  color: Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-                holidayDecoration: BoxDecoration(
-                  color: Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              headerStyle: const HeaderStyle(
-                formatButtonVisible: false,
-                titleCentered: true,
-                leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-                rightChevronIcon:
-                    Icon(Icons.chevron_right, color: Colors.white),
-              ),
-            ),
-            const SizedBox(height: 8.0),
-            Expanded(
-              child: FutureBuilder<List<Event>>(
-                future: _getEventsForSelectedDay(eventProvider),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(
+                  if (eventCount > 3) {
+                    markers.add(
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 1.0),
                         child: Text(
-                      'No hay eventos para hoy.',
-                      style: TextStyle(color: Colors.white),
-                    ));
+                          '+${eventCount - 3}',
+                          style: const TextStyle(
+                              fontSize: 12.0, color: Colors.white),
+                        ),
+                      ),
+                    );
                   }
-
-                  final events = snapshot.data!;
-                  return ListView.builder(
-                    itemCount: events.length,
-                    itemBuilder: (context, index) {
-                      final event = events[index];
-                      return ListTile(
-                        leading: Container(
-                          width: 10.0,
-                          height: 10.0,
-                          decoration: BoxDecoration(
-                            color: event.color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        title: Text(
-                          event.title,
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                        subtitle: Text(
-                          '${event.startTime.format(context)} - ${event.endTime.format(context)}',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      );
-                    },
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: markers,
                   );
-                },
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+            calendarStyle: CalendarStyle(
+              defaultTextStyle: const TextStyle(color: Colors.white),
+              weekendTextStyle: const TextStyle(color: Colors.white),
+              todayTextStyle: const TextStyle(color: Colors.white),
+              selectedTextStyle: const TextStyle(color: Colors.black),
+              todayDecoration: BoxDecoration(
+                color: Colors.blueGrey,
+                shape: BoxShape.circle,
+              ),
+              // Cambiar el color de los días alquilados para el admin
+              defaultDecoration: BoxDecoration(
+                shape: BoxShape.circle,
+              ),
+              markerDecoration: BoxDecoration(
+                color: Colors.transparent,
+                shape: BoxShape.circle,
+              ),
+              withinRangeDecoration: BoxDecoration(
+                border: Border.all(color: Colors.blue, width: 2),
+                shape: BoxShape.circle,
+              ),
+              outsideDecoration: BoxDecoration(
+                color: Colors.transparent,
+                shape: BoxShape.circle,
+              ),
+              holidayDecoration: BoxDecoration(
+                color: Colors.transparent,
+                shape: BoxShape.circle,
               ),
             ),
-            // Mostrar los días alquilados si es el administrador
-            if (isAdmin)
-              Expanded(
-                child: FutureBuilder<List<Event>>(
-                  future: Provider.of<EventProvider>(context, listen: false)
-                      .getAllEvents(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'No hay días alquilados.',
-                          style: TextStyle(color: Colors.white),
+            headerStyle: const HeaderStyle(
+              formatButtonVisible: false,
+              titleCentered: true,
+              leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
+              rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+            ),
+          ),
+          const SizedBox(height: 8.0),
+          Expanded(
+            child: FutureBuilder<List<Event>>(
+              future: _getEventsForSelectedDay(eventProvider),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(
+                      child: Text(
+                    'No hay eventos para hoy.',
+                    style: TextStyle(color: Colors.white),
+                  ));
+                }
+
+                final events = snapshot.data!;
+                return ListView.builder(
+                  itemCount: events.length,
+                  itemBuilder: (context, index) {
+                    final event = events[index];
+                    return ListTile(
+                      leading: Container(
+                        width: 10.0,
+                        height: 10.0,
+                        decoration: BoxDecoration(
+                          color: event.color,
+                          shape: BoxShape.circle,
                         ),
-                      );
-                    }
-
-                    final allEvents = snapshot.data!;
-
-                    return ListView.builder(
-                      itemCount: allEvents.length,
-                      itemBuilder: (context, index) {
-                        final event = allEvents[index];
-                        return Container(
-                          margin: const EdgeInsets.symmetric(vertical: 4.0),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.green, width: 2),
-                            borderRadius: BorderRadius.circular(8),
-                            color: event.color.withOpacity(
-                                0.3), // Cambia el color de fondo según la reserva
-                          ),
-                          child: ListTile(
-                            title: Text(
-                              'Alquilado: ${event.title}',
-                              style: const TextStyle(color: Colors.green),
-                            ),
-                            subtitle: FutureBuilder<String?>(
-                              future: DatabaseHelper()
-                                  .getUserName(int.parse(event.userId)),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return Text('Cargando...',
-                                      style:
-                                          const TextStyle(color: Colors.white));
-                                } else if (snapshot.hasError) {
-                                  return Text('Error al cargar usuario',
-                                      style:
-                                          const TextStyle(color: Colors.white));
-                                } else {
-                                  final userName = snapshot.data ??
-                                      'Usuario no encontrado'; // Proporcionar un valor por defecto
-                                  return Text(
-                                    'Usuario: $userName\nEquipo: ${event.equipment}',
-                                    style: const TextStyle(color: Colors.white),
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                        );
-                      },
+                      ),
+                      title: Text(
+                        event.title,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      subtitle: Text(
+                        '${event.startTime.format(context)} - ${event.endTime.format(context)}',
+                        style: const TextStyle(color: Colors.white),
+                      ),
                     );
                   },
-                ),
-              ),
-          ],
-        ),
+                );
+              },
+            ),
+          ),
+          // Mostrar los días alquilados si es el administrador
+        ]),
       ),
       floatingActionButton: Opacity(
         opacity: 0.8,
@@ -352,11 +288,16 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Future<List<Event>> _getEventsForSelectedDay(
       EventProvider eventProvider) async {
-    final userId = await _getUserId();
-    if (userId != null && _selectedDay != null) {
-      return eventProvider.getEventsForDay(_selectedDay!, userId);
-    }
-    return []; // Devuelve una lista vacía si el usuario no está logueado o no hay día seleccionado
+    if (isAdmin) {
+      // Si es administrador, obtener todos los eventos
+      return eventProvider.getAllEventsForDay(_selectedDate);
+    } else {
+      final userId = await _getUserId();
+      if (userId != null && _selectedDay != null) {
+        return eventProvider.getEventsForDay(_selectedDay!, userId);
+      }
+      return [];
+    } // Devuelve una lista vacía si el usuario no está logueado o no hay día seleccionado
   }
 
   void _addEvent(BuildContext context) async {

@@ -25,7 +25,8 @@ class EventProvider with ChangeNotifier {
 // Obtener todos los eventos para un día específico
   List<Event> getAllEventsForDay(DateTime day) {
     List<Event> allEventsForDay = [];
-    List<Event> allEvents = getAlEvents(); // Obtener todos los eventos
+    List<Event> allEvents =
+        getAlEvents(); // Asegúrate de llamar a este método con el nombre correcto
 
     for (var event in allEvents) {
       if (isSameDay(event.date, day)) {
@@ -266,5 +267,11 @@ class EventProvider with ChangeNotifier {
       });
     });
     return allEvents;
+  }
+
+  Future<List<Event>> getAllEventsForDayAsync(DateTime date) async {
+    // Simulación de una carga de datos asíncrona
+    await Future.delayed(const Duration(seconds: 1));
+    return getAllEventsForDay(date);
   }
 }

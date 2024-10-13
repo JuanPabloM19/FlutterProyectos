@@ -77,9 +77,9 @@ class _InputPageState extends State<LoginPage> {
         filled: true,
         fillColor: const Color(0xFF21283F),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
-        hintText: 'Email',
+        hintText: 'Correo',
         hintStyle: const TextStyle(color: Colors.white54),
-        labelText: 'Email',
+        labelText: 'Correo',
         labelStyle: const TextStyle(color: Colors.white),
         suffixIcon: const Icon(Icons.alternate_email, color: Colors.white),
         icon: const Icon(Icons.email, color: Colors.white),
@@ -100,9 +100,9 @@ class _InputPageState extends State<LoginPage> {
         filled: true,
         fillColor: const Color(0xFF21283F),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
-        hintText: 'Password',
+        hintText: 'Contraseña',
         hintStyle: const TextStyle(color: Colors.white54),
-        labelText: 'Password',
+        labelText: 'Contraseña',
         labelStyle: const TextStyle(color: Colors.white),
         suffixIcon: IconButton(
           icon: Icon(

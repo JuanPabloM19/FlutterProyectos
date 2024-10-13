@@ -9,7 +9,7 @@ class EquipmentWidget extends StatelessWidget {
   final Function(Equipment?) onChanged;
   final DateTime selectedDate;
   final TimeOfDay startTime;
-  final TimeOfDay endTime; // Añadido para tener en cuenta el rango de tiempo
+  final TimeOfDay endTime; // Added to account for time range
   final String userId;
 
   EquipmentWidget({
@@ -27,27 +27,29 @@ class EquipmentWidget extends StatelessWidget {
     final eventProvider = Provider.of<EventProvider>(context);
 
     return Container(
-      width: 200,
+      padding:
+          EdgeInsets.symmetric(horizontal: 16), // Added padding for spacing
       child: DropdownButton<Equipment>(
         value: selectedEquipment,
+        isExpanded: true, // Ensure dropdown expands to fit content
         items: equipmentList.map((equipment) {
           bool isAvailable = eventProvider.isTeamAvailable(
             equipment.nameE,
             selectedDate,
-            startTime, // Pasar la hora de inicio
-            endTime, // Pasar la hora de fin
+            startTime, // Passing start time
+            endTime, // Passing end time
           );
 
           return DropdownMenuItem<Equipment>(
             value: equipment,
             child: Text(
               equipment.nameE,
+              overflow: TextOverflow.ellipsis, // Handle long text with ellipsis
               style: TextStyle(
                 color: isAvailable ? Colors.black : Colors.grey,
               ),
             ),
-            enabled:
-                isAvailable, // Habilitar o deshabilitar según disponibilidad
+            enabled: isAvailable, // Enable/Disable based on availability
           );
         }).toList(),
         onChanged: (Equipment? equipment) {
@@ -58,10 +60,12 @@ class EquipmentWidget extends StatelessWidget {
                 startTime,
                 endTime,
               )) {
-            onChanged(equipment); // Notificar el cambio solo si está disponible
+            onChanged(equipment); // Notify only if available
           }
         },
+        icon: Icon(Icons.arrow_drop_down, color: Colors.black),
+        dropdownColor: Colors.white,
       ),
     );
   }
-} 
+}
