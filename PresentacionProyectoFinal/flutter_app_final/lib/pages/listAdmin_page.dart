@@ -1,17 +1,70 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
+import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:provider/provider.dart';
-import '../providers/event_provider.dart';
-import 'package:intl/intl.dart'; // Importa el paquete para formatear fechas
+import 'package:intl/intl.dart'; // Asegúrate de agregar esta librería para formatear fechas
 
-class RentalListPage extends StatelessWidget {
+class RentalListPage extends StatefulWidget {
+  @override
+  _RentalListPageState createState() => _RentalListPageState();
+}
+
+class _RentalListPageState extends State<RentalListPage> {
+  bool _isLoading = true; // Estado para controlar la carga
+  String _errorMessage = ''; // Estado para almacenar errores
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData(); // Cargar los datos cuando se inicia la página
+  }
+
+  Future<void> _loadData() async {
+    final eventProvider = Provider.of<EventProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    try {
+      // Cargar eventos y usuarios solo una vez
+      await Future.wait([
+        eventProvider.fetchEvents(),
+        userProvider.loadAllUsers(),
+      ]);
+      setState(() {
+        _isLoading = false; // Finalizar carga
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Error al cargar los datos: $e'; // Manejar errores
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventProvider = Provider.of<EventProvider>(context);
     final userProvider = Provider.of<UserProvider>(context);
-    final isAdmin = userProvider.isAdmin; // Verifica si el usuario es admin
 
-    // Lista de días de la semana
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Listado de Alquileres')),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_errorMessage.isNotEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Listado de Alquileres')),
+        body: Center(child: Text(_errorMessage)),
+      );
+    }
+
+    return _buildRentalList(context, eventProvider, userProvider);
+  }
+
+  Widget _buildRentalList(BuildContext context, EventProvider eventProvider,
+      UserProvider userProvider) {
+    final isAdmin = userProvider.isAdmin; // Verifica si es admin
     final List<String> daysOfWeek = [
       'Lunes',
       'Martes',
@@ -42,38 +95,38 @@ class RentalListPage extends StatelessWidget {
 
             // Ajustar la fecha para que apunte al día correcto de esta semana o la siguiente
             if (today.weekday > dayIndex) {
+              // Si el día de la semana actual ya pasó, sumar días hasta el mismo día de la próxima semana
               dayDate =
                   today.add(Duration(days: (7 - today.weekday + dayIndex)));
             } else if (today.weekday < dayIndex) {
+              // Si el día de la semana actual no ha llegado, sumar la diferencia para alcanzar el mismo día de esta semana
               dayDate = today.add(Duration(days: (dayIndex - today.weekday)));
             }
 
-            // Formatear la fecha para mostrar el día del mes
-            String formattedDate =
-                DateFormat('d').format(dayDate); // Muestra el número del día
+            // Formatear el día para que se muestre como "Lunes 14", etc.
+            final dayLabel =
+                "${DateFormat('EEEE', 'es').format(dayDate)} ${dayDate.day}";
+
+            // Verificar si es el día actual
+            final isToday = dayDate.day == today.day &&
+                dayDate.month == today.month &&
+                dayDate.year == today.year;
 
             // Obtener eventos del día correspondiente
             final eventsForDay =
                 isAdmin ? eventProvider.getAllEventsForDay(dayDate) : [];
 
-            // Verificar si es el día actual
-            bool isToday = dayDate.day == today.day &&
-                dayDate.month == today.month &&
-                dayDate.year == today.year;
-
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Divider(color: Colors.white),
                 Container(
-                  margin: const EdgeInsets.symmetric(
-                      horizontal: 16.0), // Margen horizontal
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Text(
-                    '${day.toUpperCase()} $formattedDate', // Mostrar el nombre del día y el número
+                    dayLabel.toUpperCase(),
                     style: TextStyle(
                       color: isToday
                           ? Colors.green
-                          : Colors.white, // Día actual en verde
+                          : Colors.white, // Verde si es hoy
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
@@ -81,8 +134,8 @@ class RentalListPage extends StatelessWidget {
                 ),
                 const Divider(color: Colors.white),
                 ...eventsForDay.map((event) {
-                  // Obtener el nombre del usuario utilizando el UserProvider
-                  final userName = userProvider.getUserNameById(event.userId);
+                  final userName = userProvider.getUserNameById(event.userId) ??
+                      'Usuario Desconocido';
 
                   return ListTile(
                     title: Text(
@@ -102,8 +155,7 @@ class RentalListPage extends StatelessWidget {
                 }).toList(),
                 if (eventsForDay.isEmpty)
                   Container(
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: 16.0), // Margen horizontal
+                    margin: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
                       child: Text(
@@ -119,8 +171,8 @@ class RentalListPage extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Recargar eventos desde SharedPreferences
-          Provider.of<EventProvider>(context, listen: false).loadEvents();
+          // Recargar eventos
+          _loadData();
         },
         backgroundColor: Color(0xFF80B3FF),
         child: Icon(Icons.refresh, color: Color(0xFF010618)),

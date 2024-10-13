@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/equipment_model.dart';
 import 'package:flutter_app_final/models/event_model.dart';
-import 'package:flutter_app_final/pages/RentalsListPage.dart';
+import 'package:flutter_app_final/pages/listAdmin_page.dart';
 import 'package:flutter_app_final/providers/equipment_provider.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
