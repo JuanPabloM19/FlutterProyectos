@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/user_model.dart';
-import 'package:flutter_app_final/utils/databaseHelper.dart';
+import 'package:flutter_app_final/services/firebase_services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserProvider with ChangeNotifier {
@@ -10,30 +10,39 @@ class UserProvider with ChangeNotifier {
   String _userId = '0';
   bool _isAdmin = false;
 
-  final Map<String, User> _users = {};
+  final Map<String, User> _users =
+      {}; // Mapa para almacenar usuarios por userId
 
-  final DatabaseHelper _dbHelper = DatabaseHelper();
+  final FirebaseServices _firebaseServices =
+      FirebaseServices(); // Uso de FirebaseServices
 
-  // Método para cargar todos los usuarios
+  // Método para cargar todos los usuarios desde Firebase
   Future<void> loadAllUsers() async {
-    final users =
-        await _dbHelper.getAllUsers(); // Asegúrate de que este método existe
-    _users.clear(); // Limpia usuarios previos
-    for (var user in users) {
-      _users[user['id'].toString()] = User(
-        // Convierte id a String
-        userId: user['id'].toString(),
-        name: user['name'],
-        email: user['email'],
-        isAdmin: user['isAdmin'] == 1,
-      );
+    try {
+      final users = await _firebaseServices
+          .getAllUsers(); // Obtiene usuarios desde Firebase
+
+      _users.clear(); // Limpiar el mapa de usuarios antes de agregar nuevos
+
+      for (var user in users) {
+        // Convertir userId a String y agregar al mapa
+        _users[user['userId'].toString()] = User(
+          userId: user['userId'].toString(),
+          name: user['name'],
+          email: user['email'],
+          isAdmin: user['isAdmin'] == 1,
+        );
+      }
+
+      notifyListeners(); // Notificar a los listeners para actualizar la UI
+    } catch (e) {
+      print("Error al cargar usuarios: $e");
     }
-    notifyListeners(); // Notifica a los listeners para actualizar la UI
   }
 
-// Método para obtener el nombre del usuario por ID
+  // Método para obtener el nombre del usuario por ID
   String getUserNameById(String userId) {
-    // Verifica si el mapa de usuarios contiene el userId
+    // Verificar si el mapa de usuarios contiene el userId
     if (_users.containsKey(userId)) {
       return _users[userId]?.name ?? "Usuario desconocido";
     } else {
@@ -41,22 +50,27 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  // Método para cargar datos del usuario
+  // Método para cargar los datos de un usuario específico desde Firebase
   Future<void> loadUserData(String email, String password) async {
-    final user = await _dbHelper.getUserByEmailAndPassword(email, password);
+    try {
+      final user =
+          await _firebaseServices.getUserByEmailAndPassword(email, password);
 
-    if (user.isNotEmpty) {
-      _name = user.first['name'];
-      _email = user.first['email'];
-      _userId = user.first['id'].toString(); // Asegúrate de convertir a String
-      _isAdmin = user.first['isAdmin'] == 1;
-      notifyListeners();
-    } else {
-      _name = 'Nombre Desconocido';
-      _email = 'Correo Desconocido';
-      _userId = '0';
-      _isAdmin = false;
-      notifyListeners();
+      if (user != null) {
+        _name = user['name'];
+        _email = user['email'];
+        _userId = user['userId'].toString(); // Asegúrate de convertir a String
+        _isAdmin = user['isAdmin'] == 1;
+        notifyListeners();
+      } else {
+        _name = 'Nombre Desconocido';
+        _email = 'Correo Desconocido';
+        _userId = '0';
+        _isAdmin = false;
+        notifyListeners();
+      }
+    } catch (e) {
+      print("Error al cargar datos del usuario: $e");
     }
   }
 
@@ -70,6 +84,7 @@ class UserProvider with ChangeNotifier {
     return _userId.isNotEmpty && _userId != '0';
   }
 
+  // Método para hacer logout
   void logout() {
     _name = 'Nombre Desconocido';
     _email = 'Correo Desconocido';
@@ -78,25 +93,28 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Método para cargar los nombres de usuario desde la base de datos
+  // Método para cargar los nombres de usuarios desde Firebase (actualizado para usar Firebase)
   Future<void> loadUserNames() async {
-    final List<Map<String, dynamic>> userData =
-        await DatabaseHelper().getAllUsers();
+    try {
+      final List<Map<String, dynamic>> userData =
+          await _firebaseServices.getAllUsers(); // Uso de Firebase
 
-    // Limpiar el mapa existente
-    _users.clear();
+      _users.clear(); // Limpiar el mapa de usuarios
 
-    // Agregar los usuarios al mapa
-    for (var user in userData) {
-      _users[user['userId'].toString()] = User(
-        userId: user['userId'].toString(),
-        name: user['name'],
-        email: user['email'],
-        isAdmin: user['isAdmin'] == 1,
-      );
+      for (var user in userData) {
+        // Convertir userId a String y agregar al mapa
+        _users[user['userId'].toString()] = User(
+          userId: user['userId'].toString(),
+          name: user['name'],
+          email: user['email'],
+          isAdmin: user['isAdmin'] == 1,
+        );
+      }
+
+      // Notificar a los listeners para actualizar la UI
+      notifyListeners();
+    } catch (e) {
+      print("Error al cargar los nombres de usuario: $e");
     }
-
-    // Notificar a los listeners para actualizar la UI
-    notifyListeners();
   }
 }

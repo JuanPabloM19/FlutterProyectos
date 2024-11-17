@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app_final/models/event_model.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:provider/provider.dart';
@@ -99,61 +100,82 @@ class _RentalListPageState extends State<RentalListPage> {
 
             final dayLabel =
                 "${DateFormat('EEEE', 'es').format(dayDate)} ${dayDate.day}";
-
             final isToday = dayDate.day == today.day &&
                 dayDate.month == today.month &&
                 dayDate.year == today.year;
 
-            final eventsForDay =
-                isAdmin ? eventProvider.getAllEventsForDay(dayDate) : [];
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Text(
-                    dayLabel.toUpperCase(),
-                    style: TextStyle(
-                      color: isToday ? Colors.green : Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const Divider(color: Colors.white),
-                ...eventsForDay.map((event) {
-                  final userName = userProvider.getUserNameById(event.userId) ??
-                      'Usuario Desconocido';
-
-                  return ListTile(
-                    title: Text(
-                      'Usuario: $userName',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    subtitle: Text(
-                      'Equipo: ${event.equipment}\n' +
-                          'Horario: ${event.startTime.format(context)} a ${event.endTime.format(context)}',
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                    tileColor: Colors.green.withOpacity(0.1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
+            return FutureBuilder<List<Event>>(
+              future: isAdmin
+                  ? eventProvider.getAllEventsForDay(dayDate)
+                  : Future.value([]), // Si no es admin, no cargamos eventos
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text("Error: ${snapshot.error}"));
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Text(
+                          dayLabel.toUpperCase(),
+                          style: TextStyle(
+                            color: isToday ? Colors.green : Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const Divider(color: Colors.white),
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Text('No hay alquileres para este día.',
+                              style: TextStyle(color: Colors.white70)),
+                        ),
+                      ),
+                    ],
                   );
-                }).toList(),
-                if (eventsForDay.isEmpty)
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                }
+
+                List<Event> eventsForDay = snapshot.data!;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16.0),
                       child: Text(
-                        'No hay alquileres para este día.',
-                        style: TextStyle(color: Colors.white70),
+                        dayLabel.toUpperCase(),
+                        style: TextStyle(
+                          color: isToday ? Colors.green : Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                    const Divider(color: Colors.white),
+                    ...eventsForDay.map((event) {
+                      final userName =
+                          userProvider.getUserNameById(event.userId);
+                      return ListTile(
+                        title: Text('Usuario: $userName',
+                            style: TextStyle(color: Colors.white)),
+                        subtitle: Text(
+                          'Equipo: ${event.equipment}\nHorario: ${event.startTime.format(context)} a ${event.endTime.format(context)}',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                        tileColor: Colors.green.withOpacity(0.1),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.0)),
+                      );
+                    }).toList(),
+                  ],
+                );
+              },
             );
           }).toList(),
         ),
@@ -163,11 +185,10 @@ class _RentalListPageState extends State<RentalListPage> {
         children: [
           FloatingActionButton(
             onPressed: () {
-              // Navegar a TodayPage
               Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CalendarPage()),
-              );
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const CalendarPage()));
             },
             backgroundColor: Color(0xFF80B3FF),
             child: Icon(Icons.add, color: Color(0xFF010618)),

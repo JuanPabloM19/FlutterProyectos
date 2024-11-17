@@ -44,6 +44,10 @@ dependencies:
   sqflite: ^2.3.3+2
   path: ^1.8.0
   webview_flutter: ^2.0.12
+  firebase_core: ^3.8.0
+  cloud_firestore: ^5.5.0
+  firebase_auth: ^5.3.3
+  uuid: ^4.5.1
 
 dev_dependencies:
   flutter_test:

@@ -1,9 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   factory DatabaseHelper() {
     return _instance;
@@ -20,35 +22,30 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'app_database5.db');
+    String path = join(await getDatabasesPath(), 'app_database6.db');
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _onCreate,
     );
   }
 
   Future _onCreate(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE users (
+    await db.execute('''CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         email TEXT,
         password TEXT,
-        isAdmin INTEGER DEFAULT 0 -- Agregado campo isAdmin
-      )
-    ''');
+        isAdmin INTEGER DEFAULT 0
+    )''');
 
-    await db.execute('''
-      CREATE TABLE equipment (
+    await db.execute('''CREATE TABLE equipment (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nameE TEXT,
         reservedDates TEXT
-      )
-    ''');
+    )''');
 
-    await db.execute('''
-      CREATE TABLE events (
+    await db.execute('''CREATE TABLE events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         equipmentId INTEGER,
         userId INTEGER,
@@ -59,10 +56,14 @@ class DatabaseHelper {
         endTime TEXT,
         FOREIGN KEY (equipmentId) REFERENCES equipment(id),
         FOREIGN KEY (userId) REFERENCES users(id)
-      )
-    ''');
+    )''');
 
-    // Inserta los equipos iniciales
+    // Insertar equipos y usuarios iniciales
+    await _insertInitialData(db);
+  }
+
+  Future<void> _insertInitialData(Database db) async {
+    // Equipos iniciales
     await db.insert('equipment', {'nameE': 'GPS SOUTH', 'reservedDates': ''});
     await db
         .insert('equipment', {'nameE': 'GPS HEMISPHERE', 'reservedDates': ''});
@@ -85,11 +86,12 @@ class DatabaseHelper {
     await db
         .insert('equipment', {'nameE': 'BASTON DE CANO', 'reservedDates': ''});
 
+    // Usuarios iniciales
     await db.insert('users', {
       'name': 'Joaquin Riera',
       'email': 'joariera@gmail.com',
       'password': 'password1',
-      'isAdmin': 1 // Asignar como administrador
+      'isAdmin': 1
     });
     await db.insert('users', {
       'name': 'Alejandro Munizaga',
@@ -103,6 +105,40 @@ class DatabaseHelper {
       'password': 'password3',
       'isAdmin': 0
     });
+  }
+
+  Future<void> syncDataToFirebase() async {
+    final db = await database;
+
+    // Sincronizar los usuarios con Firebase
+    List<Map<String, dynamic>> users = await db.query('users');
+    for (var user in users) {
+      await _firestore.collection('users').doc(user['id'].toString()).set(user);
+    }
+
+    // Sincronizar equipos con Firebase
+    List<Map<String, dynamic>> equipment = await db.query('equipment');
+    for (var equip in equipment) {
+      await _firestore
+          .collection('equipment')
+          .doc(equip['id'].toString())
+          .set(equip);
+    }
+
+    // Sincronizar eventos con Firebase
+    List<Map<String, dynamic>> events = await db.query('events');
+    for (var event in events) {
+      if (event['id'] != null &&
+          event['equipmentId'] != null &&
+          event['userId'] != null) {
+        await _firestore
+            .collection('events') // Cambiar a la colección `events`
+            .doc(event['id'].toString())
+            .set(event);
+      } else {
+        print('Error: Event contains null values: $event');
+      }
+    }
   }
 
   Future<List<Map<String, dynamic>>> getAllEquipment() async {
@@ -370,5 +406,18 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getAllUsers() async {
     final db = await database;
     return await db.query('users');
+  }
+
+  Future<void> addOrUpdateEquipment(Map<String, dynamic> equipment) async {
+    final db = await database;
+    int id = equipment['id'];
+    var existingEquipment =
+        await db.query('equipment', where: 'id = ?', whereArgs: [id]);
+
+    if (existingEquipment.isEmpty) {
+      await db.insert('equipment', equipment);
+    } else {
+      await db.update('equipment', equipment, where: 'id = ?', whereArgs: [id]);
+    }
   }
 }

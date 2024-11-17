@@ -1,13 +1,22 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_app_final/firebase_options.dart';
 import 'package:flutter_app_final/providers/equipment_provider.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:flutter_app_final/routes/routes.dart';
 import 'package:flutter_app_final/providers/weather_provider.dart';
+import 'package:flutter_app_final/utils/databaseHelper.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await DatabaseHelper().syncDataToFirebase();
+
   initializeDateFormatting().then((_) {
     runApp(const MyApp());
   });

@@ -3,8 +3,8 @@ import 'package:flutter_app_final/models/equipment_model.dart';
 import 'package:flutter_app_final/models/event_model.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:flutter_app_final/utils/databaseHelper.dart';
-import 'package:path/path.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 
 class EquipmentProvider with ChangeNotifier {
   List<Equipment> _equipmentList = [];
@@ -43,7 +43,6 @@ class EquipmentProvider with ChangeNotifier {
     TimeOfDay? endTime,
     Color? color,
   ) async {
-    // Verificar si el equipo está disponible antes de la reserva
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
     final equipmentName = _equipmentList
         .firstWhere((equipment) => equipment.id == equipmentId)
@@ -51,11 +50,7 @@ class EquipmentProvider with ChangeNotifier {
 
     DateTime parsedDate = DateTime.parse(date);
     bool isAvailable = eventProvider.isTeamAvailable(
-      equipmentName,
-      parsedDate,
-      startTime!,
-      endTime!,
-    );
+        equipmentName, parsedDate, startTime!, endTime!);
 
     if (!isAvailable) {
       print('El equipo no está disponible.');
@@ -63,19 +58,19 @@ class EquipmentProvider with ChangeNotifier {
     }
 
     // Si el equipo está disponible, proceder con la reserva
-    final success = await DatabaseHelper().reserveEquipment(
-      equipmentId,
-      date,
-      userId,
-      startTime,
-      endTime,
-    );
+    final success = await DatabaseHelper()
+        .reserveEquipment(equipmentId, date, userId, startTime, endTime);
 
     if (success) {
       await fetchEquipments();
+      // Generar un ID único para el evento
+      var uuid = Uuid();
+      String eventId = uuid.v4(); // Generar un ID único
+
       eventProvider.addEvent(
         context,
         Event(
+          id: eventId, // Asignamos el ID generado
           title: title,
           date: parsedDate,
           startTime: startTime,
@@ -95,11 +90,5 @@ class EquipmentProvider with ChangeNotifier {
   Future<void> freeEquipment(int equipmentId, String date) async {
     await DatabaseHelper().freeEquipment(equipmentId, date);
     await fetchEquipments();
-
-    // Lógica para liberar el equipo en EventProvider
-    DateTime parsedDate = DateTime.parse(date);
-    Provider.of<EventProvider>(context as BuildContext, listen: false)
-        .freeEquipment(
-            equipmentId, parsedDate); // Llama al método de liberar equipo
   }
 }

@@ -5,12 +5,13 @@ import 'package:flutter_app_final/pages/listAdmin_page.dart';
 import 'package:flutter_app_final/providers/equipment_provider.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
-import 'package:flutter_app_final/utils/databaseHelper.dart';
+import 'package:flutter_app_final/services/firebase_services.dart';
 import 'package:flutter_app_final/utils/equipmentWidget.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 class TodayPage extends StatelessWidget {
   const TodayPage({super.key});
@@ -39,11 +40,8 @@ class _CalendarPageState extends State<CalendarPage> {
   bool isAdmin = false;
   String? _userId;
   String? userName;
-  DateTime _selectedDate =
-      DateTime.now(); // Variable para almacenar la fecha seleccionada
-
-  // Variable para guardar los eventos del día seleccionado
-  List<Event> _selectedEvents = [];
+  DateTime _selectedDate = DateTime.now();
+  List<Event> events = [];
 
   @override
   void initState() {
@@ -52,9 +50,8 @@ class _CalendarPageState extends State<CalendarPage> {
     _loadAdminStatus();
     _loadUserId();
     _loadUserName();
+    _loadEvents(); // Cargar los eventos al iniciar// Inicializamos la lista de eventos
     Provider.of<EventProvider>(context, listen: false).loadEvents();
-
-    // Inicializa _selectedDay con hoy
   }
 
   Future<void> _loadAdminStatus() async {
@@ -64,10 +61,9 @@ class _CalendarPageState extends State<CalendarPage> {
     });
   }
 
-  // Método para cargar el nombre de usuario
   Future<void> _loadUserName() async {
     if (_userId != null) {
-      String? name = await DatabaseHelper().getUserName(int.parse(_userId!));
+      String? name = await FirebaseServices().getUserNameById(_userId!);
       setState(() {
         userName = name;
       });
@@ -83,240 +79,194 @@ class _CalendarPageState extends State<CalendarPage> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Center(child: const Text('Calendario')),
+        title: const Center(child: Text('Calendario')),
         backgroundColor: const Color(0xFF010618),
         foregroundColor: Colors.white,
       ),
       body: Container(
         color: const Color(0xFF010618),
-        child: Column(children: [
-          TableCalendar<Event>(
-            locale: 'es_ES',
-            focusedDay: _focusedDay,
-            firstDay: DateTime.utc(2020, 1, 1),
-            lastDay: DateTime.utc(2030, 12, 31),
-            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-            onDaySelected: (selectedDay, focusedDay) {
-              setState(() {
-                _selectedDay = selectedDay;
-                _focusedDay = focusedDay;
-                _selectedDate = selectedDay;
-                _loadSelectedEvents();
-              });
-            },
-            eventLoader: (day) {
-              final userProvider =
-                  Provider.of<UserProvider>(context, listen: false);
-
-              if (userProvider.isAdmin) {
-                return eventProvider.getAllEventsForDay(
-                    day); // Para el admin, obtener todos los eventos
-              } else {
-                return eventProvider.getEventsForDay(
-                    day, _userId ?? ""); // Usar el _userId cargado en el estado
-              }
-            },
-            calendarBuilders: CalendarBuilders(
-              dowBuilder: (context, day) {
-                final text = DateFormat.E('es_ES').format(day).toUpperCase();
-                return Center(
-                  child: Text(
-                    text,
-                    style: const TextStyle(
-                      fontSize: 14.0,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                );
+        child: Column(
+          children: [
+            TableCalendar<Event>(
+              locale: 'es_ES',
+              focusedDay: _focusedDay,
+              firstDay: DateTime.utc(2020, 1, 1),
+              lastDay: DateTime.utc(2030, 12, 31),
+              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+              onDaySelected: (selectedDay, focusedDay) {
+                setState(() {
+                  _selectedDay = selectedDay;
+                  _focusedDay = focusedDay;
+                  _selectedDate = selectedDay;
+                  _loadSelectedEvents(); // Cargar eventos para el día seleccionado
+                });
               },
-              headerTitleBuilder: (context, day) {
-                final text =
-                    DateFormat.yMMMM('es_ES').format(day).toUpperCase();
-                return Center(
-                  child: Text(
-                    text,
-                    style: const TextStyle(
-                      fontSize: 20.0,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                );
+              eventLoader: (day) {
+                return events
+                    .where((event) => isSameDay(event.date, day))
+                    .toList();
               },
-              markerBuilder: (context, day, events) {
-                final eventCount = events.length;
-                if (eventCount > 0) {
-                  List<Widget> markers = [];
-                  for (int i = 0; i < eventCount && i < 3; i++) {
-                    Color markerColor = events[i].color;
-
-                    // Aplicar un color específico para el admin
-                    if (isAdmin) {
-                      markerColor = events[i].color.withOpacity(0.8);
-                    }
-
-                    markers.add(
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 1.0),
-                        width: 6.0,
-                        height: 6.0,
-                        decoration: BoxDecoration(
-                          color: markerColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    );
-                  }
-                  if (eventCount > 3) {
-                    markers.add(
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 1.0),
-                        child: Text(
-                          '+${eventCount - 3}',
-                          style: const TextStyle(
-                              fontSize: 12.0, color: Colors.white),
-                        ),
-                      ),
-                    );
-                  }
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: markers,
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-            calendarStyle: CalendarStyle(
-              defaultTextStyle: const TextStyle(color: Colors.white),
-              weekendTextStyle: const TextStyle(color: Colors.white),
-              todayTextStyle: const TextStyle(color: Colors.white),
-              selectedTextStyle: const TextStyle(color: Colors.black),
-              todayDecoration: BoxDecoration(
-                color: Colors.blueGrey,
-                shape: BoxShape.circle,
-              ),
-              // Cambiar el color de los días alquilados para el admin
-              defaultDecoration: BoxDecoration(
-                shape: BoxShape.circle,
-              ),
-              markerDecoration: BoxDecoration(
-                color: Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-              withinRangeDecoration: BoxDecoration(
-                border: Border.all(color: Colors.blue, width: 2),
-                shape: BoxShape.circle,
-              ),
-              outsideDecoration: BoxDecoration(
-                color: Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-              holidayDecoration: BoxDecoration(
-                color: Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-            ),
-            headerStyle: const HeaderStyle(
-              formatButtonVisible: false,
-              titleCentered: true,
-              leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-              rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
-            ),
-          ),
-          const SizedBox(height: 8.0),
-          Expanded(
-            child: FutureBuilder<List<Event>>(
-              future: _getEventsForSelectedDay(
-                  eventProvider), // Pasar el eventProvider
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(
+              calendarBuilders: CalendarBuilders(
+                dowBuilder: (context, day) {
+                  final text = DateFormat.E('es_ES').format(day).toUpperCase();
+                  return Center(
                     child: Text(
-                      'No hay eventos para hoy.',
-                      style: TextStyle(color: Colors.white),
+                      text,
+                      style: const TextStyle(
+                        fontSize: 14.0,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   );
-                }
-
-                final events = snapshot.data!;
-                _selectedEvents = events; // Guardar eventos seleccionados
-
-                return ListView.builder(
-                  itemCount: events.length,
-                  itemBuilder: (context, index) {
-                    final event = events[index];
-                    return ListTile(
-                      leading: Container(
-                        width: 10.0,
-                        height: 10.0,
-                        decoration: BoxDecoration(
-                          color: event.color,
-                          shape: BoxShape.circle,
-                        ),
+                },
+                headerTitleBuilder: (context, day) {
+                  final text =
+                      DateFormat.yMMMM('es_ES').format(day).toUpperCase();
+                  return Center(
+                    child: Text(
+                      text,
+                      style: const TextStyle(
+                        fontSize: 20.0,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                      title: Text(
-                        event.equipment,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      subtitle: Text(
-                        '${event.startTime.format(context)} - ${event.endTime.format(context)}',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.white),
-                            onPressed: () {
-                              _editEvent(context, event);
-                            },
+                    ),
+                  );
+                },
+                markerBuilder: (context, day, events) {
+                  if (events.isNotEmpty) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: events.map((event) {
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                          width: 10.0,
+                          height: 10.0,
+                          decoration: BoxDecoration(
+                            color:
+                                Colors.blue, // Color fijo para todos los puntos
+                            shape: BoxShape.circle,
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () {
-                              _deleteEvent(event);
-                            },
-                          ),
-                        ],
+                        );
+                      }).toList(),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+              calendarStyle: CalendarStyle(
+                defaultTextStyle: const TextStyle(color: Colors.white),
+                weekendTextStyle: const TextStyle(color: Colors.white),
+                todayTextStyle: const TextStyle(color: Colors.white),
+                selectedTextStyle: const TextStyle(color: Colors.black),
+                todayDecoration: BoxDecoration(
+                  color: Colors.blueGrey,
+                  shape: BoxShape.circle,
+                ),
+                markerDecoration: BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                withinRangeDecoration: BoxDecoration(
+                  border: Border.all(color: Colors.blue, width: 2),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              headerStyle: const HeaderStyle(
+                formatButtonVisible: false,
+                titleCentered: true,
+                leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
+                rightChevronIcon:
+                    Icon(Icons.chevron_right, color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 8.0),
+            Expanded(
+              child: FutureBuilder<List<Event>>(
+                future: _getEventsForSelectedDay(
+                    eventProvider), // Usamos la función para obtener eventos
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No hay eventos para hoy.',
+                        style: TextStyle(color: Colors.white),
                       ),
                     );
-                  },
-                );
-              },
+                  }
+
+                  final events = snapshot.data!;
+
+                  return ListView.builder(
+                    itemCount: events.length,
+                    itemBuilder: (context, index) {
+                      final event = events[index];
+                      return ListTile(
+                        leading: Container(
+                          width: 10.0,
+                          height: 10.0,
+                          decoration: BoxDecoration(
+                            color: event.color ??
+                                Colors
+                                    .blue, // Usa el color del evento, si no, usa azul
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        title: Text(
+                          event.equipment,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          '${event.startTime.format(context)} - ${event.endTime.format(context)}',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.white),
+                              onPressed: () {
+                                _editEvent(context, event);
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                _deleteEvent(event);
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ]),
+          ],
+        ),
       ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // Botón para agregar eventos
           FloatingActionButton(
-            onPressed: () => _addEvent(context), // Lógica para agregar evento
+            onPressed: () => _addEvent(context),
             backgroundColor: const Color(0xFF80B3FF),
-            child: const Icon(
-              Icons.add,
-              color: Color(0xFF010618),
-            ),
+            child: const Icon(Icons.add, color: Color(0xFF010618)),
           ),
           const SizedBox(height: 16),
-          // Botón para regresar al listado de alquileres, visible solo para admin
           if (isAdmin)
             FloatingActionButton(
               onPressed: () {
-                Navigator.pop(context); // Regresar al listado de alquileres
+                Navigator.pop(context);
               },
               backgroundColor: const Color(0xFF80B3FF),
-              child: const Icon(
-                Icons.arrow_back,
-                color: Color(0xFF010618),
-              ),
+              child: const Icon(Icons.arrow_back, color: Color(0xFF010618)),
             ),
         ],
       ),
@@ -324,12 +274,12 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   // Cargar eventos para el día seleccionado
-  void _loadSelectedEvents() async {
+  Future<List<Event>> _loadSelectedEvents() async {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
-    final events = await _getEventsForSelectedDay(eventProvider);
-    setState(() {
-      _selectedEvents = events; // Actualiza la lista de eventos seleccionados
-    });
+    final userId = _userId ?? '';
+
+    // Verifica si el usuario tiene eventos para el día seleccionado
+    return eventProvider.getEventsForDay(_selectedDate, userId);
   }
 
   Future<String?> _getUserId() async {
@@ -343,12 +293,13 @@ class _CalendarPageState extends State<CalendarPage> {
       // Si es administrador, obtener todos los eventos
       return eventProvider.getAllEventsForDay(_selectedDate);
     } else {
+      // Obtener el userId desde Firebase Authentication (o de donde corresponda)
       final userId = await _getUserId();
-      if (userId != null && _selectedDay != null) {
-        return eventProvider.getEventsForDay(_selectedDay!, userId);
+      if (userId != null && _selectedDate != null) {
+        return eventProvider.getEventsForDay(_selectedDate, userId);
       }
-      return [];
-    } // Devuelve una lista vacía si el usuario no está logueado o no hay día seleccionado
+    }
+    return []; // Devuelve una lista vacía si no se cumple ninguna condición
   }
 
   void _editEvent(BuildContext context, Event event) async {
@@ -356,19 +307,17 @@ class _CalendarPageState extends State<CalendarPage> {
     final equipmentProvider =
         Provider.of<EquipmentProvider>(context, listen: false);
 
-    Color selectedColor = event.color;
     TimeOfDay startTime = event.startTime;
     TimeOfDay endTime = event.endTime;
 
     await equipmentProvider.fetchEquipments();
     List<Equipment> equipmentList = equipmentProvider.equipmentList;
 
-    // Aquí permitimos que selectedEquipment sea nullable
     Equipment? selectedEquipment = equipmentList.firstWhere(
       (e) => e.nameE == event.equipment,
       orElse: () {
         throw Exception('Equipo no encontrado');
-      }, // Cambiamos a null en caso de no encontrar el equipo
+      }, // Si no se encuentra, return null
     );
 
     String eventType = event.title;
@@ -398,12 +347,11 @@ class _CalendarPageState extends State<CalendarPage> {
                   },
                 ),
                 EquipmentWidget(
-                  selectedEquipment: selectedEquipment, // Permitir null
+                  selectedEquipment: selectedEquipment,
                   equipmentList: equipmentList,
                   onChanged: (equipment) {
                     if (equipment != null) {
-                      selectedEquipment =
-                          equipment; // Actualiza el equipo seleccionado
+                      selectedEquipment = equipment;
                     }
                   },
                   selectedDate: event.date,
@@ -468,13 +416,13 @@ class _CalendarPageState extends State<CalendarPage> {
 
               Event updatedEvent = event.copyWith(
                 title: eventType,
-                equipment: selectedEquipment!.nameE, // Desempacar seguro
+                equipment: selectedEquipment!.nameE,
                 startTime: startTime,
                 endTime: endTime,
               );
 
-              eventProvider.editEvent(
-                  context, event.date, event, event.date, updatedEvent);
+              eventProvider.editEvent(context, event, updatedEvent);
+
               Navigator.of(context).pop();
             },
           ),
@@ -483,7 +431,6 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
-// Método para eliminar un evento
   void _deleteEvent(Event event) {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
 
@@ -496,7 +443,6 @@ class _CalendarPageState extends State<CalendarPage> {
           content:
               const Text('¿Estás seguro de que deseas eliminar este evento?'),
           actions: <Widget>[
-            // Botón Cancelar
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF80B3FF),
@@ -505,13 +451,11 @@ class _CalendarPageState extends State<CalendarPage> {
               child: const Text('Cancelar'),
               onPressed: () => Navigator.of(context).pop(),
             ),
-            // Botón Eliminar
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color.fromARGB(255, 228, 25, 10),
                 foregroundColor: Colors.white,
-                textStyle:
-                    const TextStyle(fontWeight: FontWeight.bold), // Negrita
+                textStyle: const TextStyle(fontWeight: FontWeight.bold),
               ),
               child: const Text('Eliminar'),
               onPressed: () {
@@ -519,7 +463,7 @@ class _CalendarPageState extends State<CalendarPage> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Evento eliminado')),
                 );
-                Navigator.of(context).pop(); // Cerrar el diálogo
+                Navigator.of(context).pop();
               },
             ),
           ],
@@ -532,18 +476,16 @@ class _CalendarPageState extends State<CalendarPage> {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
     final equipmentProvider =
         Provider.of<EquipmentProvider>(context, listen: false);
-    Color selectedColor = Colors.blue;
+    Color selectedColor = Colors.blue; // Valor inicial
     TimeOfDay? startTime;
     TimeOfDay? endTime;
     Equipment? selectedEquipment;
-
     final userId = await _getUserId();
 
     if (userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Por favor, inicia sesión para agregar un evento.'),
-        ),
+            content: Text('Por favor, inicia sesión para agregar un evento.')),
       );
       return;
     }
@@ -551,20 +493,19 @@ class _CalendarPageState extends State<CalendarPage> {
     await equipmentProvider.fetchEquipments();
     await eventProvider.fetchEvents();
 
-    // Tipo de evento inicial
-    String eventType = 'Préstamo'; // Valor inicial
+    String eventType = 'Préstamo';
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: const Text('Agregar Evento',
-                style: TextStyle(color: Colors.black87)),
+            title: const Text('Agregar Evento'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Tipo de evento
                   DropdownButton<String>(
                     value: eventType,
                     items: const [
@@ -576,98 +517,86 @@ class _CalendarPageState extends State<CalendarPage> {
                     onChanged: (String? newValue) {
                       if (newValue != null) {
                         setState(() {
-                          eventType = newValue; // Actualiza el tipo de evento
+                          eventType = newValue;
                         });
                       }
                     },
                   ),
-                  const SizedBox(height: 8.0),
-                  Container(
-                    width: 200,
-                    child: DropdownButton<Color>(
-                      isExpanded: true,
-                      value: selectedColor,
-                      items: const [
-                        DropdownMenuItem(
-                          value: Colors.blue,
-                          child: Text('Azul',
-                              style:
-                                  TextStyle(color: Colors.blue, fontSize: 14)),
-                        ),
-                        DropdownMenuItem(
-                          value: Colors.red,
-                          child: Text('Rojo',
-                              style:
-                                  TextStyle(color: Colors.red, fontSize: 14)),
-                        ),
-                        DropdownMenuItem(
-                          value: Colors.green,
-                          child: Text('Verde',
-                              style:
-                                  TextStyle(color: Colors.green, fontSize: 14)),
-                        ),
-                      ],
-                      onChanged: (Color? value) {
-                        if (value != null) {
-                          setState(() {
-                            selectedColor = value;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8.0),
-                  TextButton(
-                    onPressed: () async {
-                      final selectedStartTime = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.now(),
-                      );
-                      if (selectedStartTime != null) {
+                  // Selección de color
+                  DropdownButton<Color>(
+                    value: selectedColor,
+                    items: const [
+                      DropdownMenuItem(
+                        value: Colors.blue,
+                        child:
+                            Text('Azul', style: TextStyle(color: Colors.blue)),
+                      ),
+                      DropdownMenuItem(
+                        value: Colors.red,
+                        child:
+                            Text('Rojo', style: TextStyle(color: Colors.red)),
+                      ),
+                      DropdownMenuItem(
+                        value: Colors.green,
+                        child: Text('Verde',
+                            style: TextStyle(color: Colors.green)),
+                      ),
+                    ],
+                    onChanged: (Color? newColor) {
+                      if (newColor != null) {
                         setState(() {
-                          startTime = selectedStartTime;
+                          selectedColor = newColor;
                         });
                       }
                     },
-                    child: Text(
-                      startTime == null
-                          ? 'Seleccionar Hora Inicio'
-                          : 'Hora Inicio: ${startTime!.format(context)}',
-                      style: const TextStyle(color: Colors.black87),
-                    ),
                   ),
-                  TextButton(
-                    onPressed: () async {
-                      final selectedEndTime = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.now(),
-                      );
-                      if (selectedEndTime != null) {
-                        setState(() {
-                          endTime = selectedEndTime;
-                        });
-                      }
-                    },
-                    child: Text(
-                      endTime == null
-                          ? 'Seleccionar Hora Fin'
-                          : 'Hora Fin: ${endTime!.format(context)}',
-                      style: const TextStyle(color: Colors.black87),
-                    ),
-                  ),
-                  const SizedBox(height: 8.0),
+                  // Selección del equipo
                   EquipmentWidget(
                     selectedEquipment: selectedEquipment,
                     equipmentList: equipmentProvider.equipmentList,
-                    onChanged: (Equipment? equipment) {
+                    onChanged: (equipment) {
                       setState(() {
                         selectedEquipment = equipment;
                       });
                     },
-                    selectedDate: _selectedDay ?? _focusedDay,
-                    userId: userId,
+                    selectedDate: _selectedDate,
                     startTime: startTime ?? TimeOfDay.now(),
                     endTime: endTime ?? TimeOfDay.now(),
+                    userId: userId,
+                  ),
+                  // Selección de hora de inicio
+                  ListTile(
+                    title: const Text('Hora de Inicio'),
+                    trailing:
+                        Text(startTime?.format(context) ?? 'Seleccionar hora'),
+                    onTap: () async {
+                      final TimeOfDay? newTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (newTime != null) {
+                        setState(() {
+                          startTime = newTime;
+                        });
+                      }
+                    },
+                  ),
+                  // Selección de hora de fin
+                  ListTile(
+                    title: const Text('Hora de Fin'),
+                    trailing:
+                        Text(endTime?.format(context) ?? 'Seleccionar hora'),
+                    onTap: () async {
+                      final TimeOfDay? newTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (newTime != null) {
+                        setState(() {
+                          endTime = newTime;
+                        });
+                      }
+                    },
                   ),
                 ],
               ),
@@ -684,63 +613,43 @@ class _CalendarPageState extends State<CalendarPage> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Color.fromARGB(255, 1, 170, 15),
-                  foregroundColor: Color.fromARGB(255, 255, 255, 255),
+                  foregroundColor: Colors.white,
+                  textStyle: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                child: const Text(
-                  'Agregar',
-                ),
+                child: const Text('Agregar'),
                 onPressed: () {
-                  if (startTime == null || endTime == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            'Por favor, selecciona la hora de inicio y fin.'),
-                      ),
-                    );
-                    return;
-                  }
                   if (selectedEquipment == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Por favor, selecciona un equipo.'),
-                      ),
+                          content: Text('Por favor, selecciona un equipo.')),
+                    );
+                    return;
+                  }
+                  if (startTime == null || endTime == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content:
+                              Text('Por favor, selecciona horas válidas.')),
                     );
                     return;
                   }
 
-                  final isAvailable = eventProvider.isTeamAvailable(
-                    selectedEquipment!.nameE,
-                    _selectedDay ?? _focusedDay,
-                    startTime!,
-                    endTime!,
+                  // Crear un ID único para el evento
+                  var uuid = Uuid();
+                  String eventId = uuid.v4(); // Genera un ID único
+
+                  Event newEvent = Event(
+                    id: eventId, // Asignamos el ID generado
+                    title: eventType,
+                    equipment: selectedEquipment!.nameE,
+                    startTime: startTime!,
+                    endTime: endTime!,
+                    date: _selectedDay ?? _focusedDay,
+                    userId: userId,
+                    color: selectedColor, // Se pasa el color seleccionado aquí
                   );
-
-                  if (!isAvailable) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            'El equipo ya está reservado en esta fecha y hora.'),
-                      ),
-                    );
-                  } else {
-                    // Agregar el evento aquí
-                    eventProvider.addEvent(
-                      context,
-                      Event(
-                        title: eventType,
-                        date: _selectedDay ?? _focusedDay,
-                        startTime: startTime!,
-                        endTime: endTime!,
-                        color: selectedColor,
-                        equipment: selectedEquipment!.nameE,
-                        userId: userId,
-                        data:
-                            'Your additional data', // Cambia según sea necesario
-                      ),
-                    );
-
-                    Navigator.of(context).pop();
-                  }
+                  eventProvider.addEvent(context, newEvent);
+                  Navigator.pop(context);
                 },
               ),
             ],
@@ -748,6 +657,22 @@ class _CalendarPageState extends State<CalendarPage> {
         },
       ),
     );
+  }
+
+  Future<void> _loadEvents() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final eventProvider = Provider.of<EventProvider>(context, listen: false);
+
+    if (userProvider.isAdmin) {
+      // Obtener todos los eventos para el día
+      events = await eventProvider.getAllEventsForDay(_focusedDay);
+    } else {
+      // Obtener los eventos del usuario para ese día
+      final userId = _userId ?? ""; // Usa el userId cargado en el estado
+      events = await eventProvider.getEventsForDay(_focusedDay, userId);
+    }
+
+    setState(() {}); // Actualizar el estado con los eventos cargados
   }
 
   Future<void> _loadUserId() async {

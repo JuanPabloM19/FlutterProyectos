@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "626216116833",
-    "project_id": "flutterappfinal-5c5c5",
-    "storage_bucket": "flutterappfinal-5c5c5.appspot.com"
+    "project_number": "278381638902",
+    "project_id": "tecappflutter",
+    "storage_bucket": "tecappflutter.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:626216116833:android:03f9a39344e7b425eec020",
+        "mobilesdk_app_id": "1:278381638902:android:56d7a1d037b55aed3ce8d7",
         "android_client_info": {
-          "package_name": "com.example.flutter_app_final"
+          "package_name": "com.tecapp.app"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCp0gWDeqrqMoLSxKqlJ9jINr7NUJT6OeA"
+          "current_key": "AIzaSyAdZrsoiYN7hZj2cNE5C3WA4esjjPy5-Pw"
         }
       ],
       "services": {

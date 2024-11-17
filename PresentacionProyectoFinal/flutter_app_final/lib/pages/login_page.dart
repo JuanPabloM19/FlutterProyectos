@@ -1,9 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
-import 'package:flutter_app_final/utils/databaseHelper.dart';
-import 'package:flutter_app_final/utils/navigation_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_app_final/utils/navigation_bar.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -126,31 +126,33 @@ class _InputPageState extends State<LoginPage> {
   }
 
   void _login(BuildContext context) async {
-    final dbHelper = DatabaseHelper();
-    List<Map<String, dynamic>> user =
-        await dbHelper.getUserByEmailAndPassword(_email, _password);
+    try {
+      // Usar Firebase Authentication para iniciar sesión
+      UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _email,
+        password: _password,
+      );
 
-    if (user.isNotEmpty) {
-      String email = user[0]['email'];
-      String userId = user[0]['id'].toString();
-      bool isAdmin = user[0]['isAdmin'] == 1; // Obtener el estado de isAdmin
+      // Obtener ID de usuario desde Firebase Auth
+      String userId = userCredential.user!.uid;
 
       // Cargar datos del usuario en el UserProvider
       Provider.of<UserProvider>(context, listen: false)
-          .loadUserData(email, _password); // Solo pasas email y password
+          .loadUserData(_email, _password);
 
       // Almacenar el ID del usuario en SharedPreferences
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-          'userId', userId); // Guarda el ID en SharedPreferences
+      await prefs.setString('userId', userId);
 
       _showSuccessDialog(context);
-    } else {
-      _showErrorDialog(context);
+    } on FirebaseAuthException catch (e) {
+      // Mostrar un error si las credenciales no son correctas
+      _showErrorDialog(context, e.message ?? "Error desconocido");
     }
   }
 
-  void _showErrorDialog(BuildContext context) {
+  void _showErrorDialog(BuildContext context, String message) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -162,7 +164,7 @@ class _InputPageState extends State<LoginPage> {
               Text("Error"),
             ],
           ),
-          content: const Text("Correo y/o contraseña incorrecta"),
+          content: Text(message),
           actions: [
             TextButton(
               child: const Text(
