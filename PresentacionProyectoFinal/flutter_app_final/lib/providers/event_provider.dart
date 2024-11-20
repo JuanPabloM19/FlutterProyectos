@@ -2,18 +2,24 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:flutter_app_final/services/firebase_services.dart';
+import 'package:path/path.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../models/event_model.dart';
 
 class EventProvider with ChangeNotifier {
-  final Map<String, Map<DateTime, List<Event>>> _userEvents = {};
+  final FirebaseServices _firebaseServices = FirebaseServices();
   Map<DateTime, List<String>> _occupiedTeams = {};
   List<Event> _events = [];
-
-  final FirebaseServices _firebaseServices = FirebaseServices();
+  Map<String, Map<DateTime, List<Event>>> _userEvents = {};
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final UserProvider _userProvider =
+      UserProvider(); // O accede a través de provider
+
+  List<Event> get events => _events;
 
   EventProvider() {
     loadEvents(); // Cargar eventos al inicializar
@@ -21,35 +27,62 @@ class EventProvider with ChangeNotifier {
   }
 
   // Método para obtener todos los eventos de Firebase
-// Método para obtener todos los eventos de Firebase
-  Future<List<Event>> fetchEvents() async {
+  Future<void> fetchEvents({bool isAdmin = false}) async {
     try {
-      String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-      if (userId.isEmpty) {
-        throw Exception('Usuario no autenticado.');
+      print("Iniciando fetchEvents para ${isAdmin ? 'admin' : 'usuario'}");
+
+      if (isAdmin) {
+        // Obtener todos los eventos de todos los usuarios
+        _events = await _firebaseServices.getAllAdminEvents();
+      } else {
+        // Obtener eventos del usuario autenticado
+        String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+        if (userId.isEmpty) {
+          print("Error: Usuario no autenticado.");
+          return;
+        }
+        _events = await _firebaseServices.getAllEvents(userId);
       }
 
-      final events = await _firebaseServices.getAllEvents(userId);
-      _events = events; // Almacenamos los eventos en la lista _events
-      notifyListeners(); // Notificamos a los listeners (UI) que los eventos han cambiado
-      return events;
+      print("Eventos cargados: ${_events.length}");
+      notifyListeners();
     } catch (e) {
       print("Error al obtener eventos: $e");
-      return [];
     }
   }
 
-  Future<List<Event>> getEventsForDay(DateTime day, String userId) async {
+  // Agrupar eventos por fecha
+  Map<DateTime, List<Event>> _groupEventsByDate(List<Event> events) {
+    final Map<DateTime, List<Event>> groupedEvents = {};
+    for (var event in events) {
+      final dateOnly =
+          DateTime(event.date.year, event.date.month, event.date.day);
+      if (!groupedEvents.containsKey(dateOnly)) {
+        groupedEvents[dateOnly] = [];
+      }
+      groupedEvents[dateOnly]!.add(event);
+    }
+    return groupedEvents;
+  }
+
+  // Obtener eventos de Firebase y actualizar estado local
+  Future<void> fetchUserEventsFromFirebase(
+      BuildContext context, String userId) async {
+    final events = await _firebaseServices.getAllEvents(userId);
+    _userEvents[userId] = _groupEventsByDate(events);
+    notifyListeners();
+  }
+
+  List<Event> getEventsForDay(DateTime selectedDay, String userId) {
     try {
-      // Obtiene todos los eventos del usuario desde FirebaseServices
-      List<Event> allEvents = await _firebaseServices.getAllEvents(userId);
+      return _events.where((event) {
+        final eventDateOnly =
+            DateTime(event.date.year, event.date.month, event.date.day);
+        final selectedDayOnly =
+            DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
 
-      // Filtra los eventos para el día especificado
-      List<Event> eventsForDay = allEvents.where((event) {
-        return isSameDay(event.date, day); // Usa isSameDay para comparar fechas
+        return event.userId == userId && eventDateOnly == selectedDayOnly;
       }).toList();
-
-      return eventsForDay;
     } catch (e) {
       print("Error al filtrar eventos del día: $e");
       return [];
@@ -62,26 +95,72 @@ class EventProvider with ChangeNotifier {
         date1.day == date2.day;
   }
 
-  // Obtener todos los eventos para un día específico, independientemente del usuario
-  Future<List<Event>> getAllEventsForDay(DateTime day) async {
-    List<Event> allEventsForDay = [];
-    final allEvents = await fetchEvents(); // Obtener todos los eventos
+  Future<List<Event>> getAllEventsForDay(DateTime day,
+      {bool isAdmin = false, BuildContext? buildContext}) async {
+    try {
+      List<Event> eventsForDay = [];
 
-    for (var event in allEvents) {
-      if (isSameDay(event.date, day)) {
-        allEventsForDay.add(event);
+      if (isAdmin) {
+        // Obtener eventos de todos los usuarios
+        QuerySnapshot usersSnapshot =
+            await FirebaseFirestore.instance.collection('users').get();
+
+        for (var userDoc in usersSnapshot.docs) {
+          // Obtener eventos de cada usuario
+          QuerySnapshot eventsSnapshot =
+              await userDoc.reference.collection('events').get();
+
+          for (var eventDoc in eventsSnapshot.docs) {
+            Event event =
+                Event.fromJson(eventDoc.data() as Map<String, dynamic>);
+
+            if (isSameDay(event.date, day)) {
+              eventsForDay.add(event);
+            }
+          }
+        }
+      } else {
+        if (buildContext == null) {
+          throw ArgumentError(
+              'buildContext is required when isAdmin is false.');
+        }
+        // Usuario no administrador, obtener solo sus eventos
+        final userProvider =
+            Provider.of<UserProvider>(buildContext, listen: false);
+        String userId = userProvider.userId;
+
+        QuerySnapshot eventsSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('events')
+            .get();
+
+        for (var eventDoc in eventsSnapshot.docs) {
+          final data = eventDoc.data() as Map<String, dynamic>;
+          if (data.isNotEmpty) {
+            Event event = Event.fromJson(data);
+            if (isSameDay(event.date, day)) {
+              eventsForDay.add(event);
+            }
+          }
+        }
       }
+
+      return eventsForDay;
+    } catch (e) {
+      print("Error al obtener eventos para el día: $e");
+      return [];
     }
-    return allEventsForDay;
   }
 
-  // Editar un evento
+  // Editar evento
   Future<void> editEvent(
-      BuildContext context, Event event, Event updatedEvent) async {
+      BuildContext context, Event oldEvent, Event updatedEvent) async {
     try {
-      await _firebaseServices.updateEvent(event, updatedEvent, context);
-      // Actualizar eventos en local si es necesario
-      notifyListeners();
+      await _firebaseServices.updateEvent(oldEvent, updatedEvent, context);
+
+      // Refrescar eventos locales desde Firebase
+      await fetchUserEventsFromFirebase(context, updatedEvent.userId);
     } catch (e) {
       print("Error al editar evento: $e");
     }
@@ -141,35 +220,29 @@ class EventProvider with ChangeNotifier {
     _userEvents[userId]![dateOnly]!.add(event);
   }
 
-  // Método para eliminar un evento
+  // Eliminar evento
   Future<void> deleteEvent(
       BuildContext context, DateTime date, Event event) async {
-    final userId = event.userId;
-    DateTime dateOnly = DateTime(date.year, date.month, date.day);
+    try {
+      final firebaseServices = FirebaseServices();
+      await firebaseServices.deleteEvent(event.userId, event);
 
-    if (_userEvents[userId] != null && _userEvents[userId]![dateOnly] != null) {
-      _userEvents[userId]![dateOnly]!.remove(event);
+      // Eliminar el evento de la lista local
+      final dateOnly = DateTime(date.year, date.month, date.day);
+      _userEvents[event.userId]?[dateOnly]
+          ?.removeWhere((e) => e.id == event.id);
 
-      if (_userEvents[userId]![dateOnly]!.isEmpty) {
-        _userEvents[userId]!.remove(dateOnly);
-      }
-
-      // Liberar el equipo ocupado
-      if (_occupiedTeams[dateOnly] != null) {
-        _occupiedTeams[dateOnly]!.remove(event.equipment);
-        if (_occupiedTeams[dateOnly]!.isEmpty) {
-          _occupiedTeams.remove(dateOnly);
-        }
-      }
-
-      // Guardar los cambios en Firebase
-      await _firebaseServices.deleteEvent(userId, event);
-      _saveOccupiedTeams();
+      // Notificar a los widgets dependientes que los eventos han cambiado
       notifyListeners();
+      // Recargar eventos desde Firebase para sincronizar
+      await fetchUserEventsFromFirebase(context, event.userId);
+    } catch (e) {
+      print('Error al eliminar evento: $e');
+      throw e;
     }
   }
 
-  // Método público para cargar eventos
+// Método público para cargar eventos
   Future<void> loadEvents() async {
     try {
       String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -178,19 +251,27 @@ class EventProvider with ChangeNotifier {
         return;
       }
 
-      final events = await fetchEvents();
+      // Espera los eventos antes de proceder
+      await fetchEvents(); // Asegúrate de que los eventos están cargados
+
+      // Limpiar eventos previos
       _userEvents.clear();
 
-      for (var event in events) {
-        final dateOnly =
-            DateTime(event.date.year, event.date.month, event.date.day);
-        if (_userEvents[userId] == null) {
-          _userEvents[userId] = {};
+      // Iterar sobre los eventos si no están vacíos
+      if (_events.isNotEmpty) {
+        for (var event in _events) {
+          final dateOnly =
+              DateTime(event.date.year, event.date.month, event.date.day);
+          if (_userEvents[userId] == null) {
+            _userEvents[userId] = {};
+          }
+          if (_userEvents[userId]![dateOnly] == null) {
+            _userEvents[userId]![dateOnly] = [];
+          }
+          _userEvents[userId]![dateOnly]!.add(event);
         }
-        if (_userEvents[userId]![dateOnly] == null) {
-          _userEvents[userId]![dateOnly] = [];
-        }
-        _userEvents[userId]![dateOnly]!.add(event);
+      } else {
+        print("No se encontraron eventos para cargar.");
       }
     } catch (e) {
       print("Error al cargar eventos: $e");

@@ -57,9 +57,9 @@ class Event {
       'id': id,
       'title': title,
       'date': date.toIso8601String(),
-      'startTime': startTime.format(context),
-      'endTime': endTime.format(context),
-      'color': color.value, // Convierte Color a entero
+      'startTime': {'hour': startTime.hour, 'minute': startTime.minute},
+      'endTime': {'hour': endTime.hour, 'minute': endTime.minute},
+      'color': color.value, // Guardar como entero
       'userId': userId,
       'equipment': equipment,
       'data': data,
@@ -69,68 +69,78 @@ class Event {
   // Método para convertir de Firestore a un Event
   factory Event.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+
+    TimeOfDay parseTime(dynamic time) {
+      if (time is Map<String, dynamic>) {
+        // Asume que viene en formato {hour, minute}
+        return TimeOfDay(hour: time['hour'], minute: time['minute']);
+      } else if (time is String) {
+        final parts = time.split(':');
+        return TimeOfDay(
+          hour: int.parse(parts[0]),
+          minute: int.parse(parts[1]),
+        );
+      } else {
+        throw ArgumentError('Formato inválido para startTime o endTime');
+      }
+    }
+
     return Event(
       id: doc.id,
-      title: data['title'],
+      title: data['title'] ?? '',
       date: (data['date'] as Timestamp).toDate(),
-      startTime:
-          TimeOfDay.fromDateTime((data['startTime'] as Timestamp).toDate()),
-      endTime: TimeOfDay.fromDateTime((data['endTime'] as Timestamp).toDate()),
-      color: Color(int.parse(data['color'])),
-      userId: data['userId'],
-      equipment: data['equipment'],
-      data: data['data'],
+      startTime: parseTime(data['startTime']),
+      endTime: parseTime(data['endTime']),
+      color: Color(int.tryParse(data['color'].toString()) ?? 0xFF000000),
+      userId: data['userId'] ?? '',
+      equipment: data['equipment'] ?? '',
+      data: data['data'] ?? '',
     );
   }
 
   static Event fromJson(Map<String, dynamic> json) {
-    if (json['title'] == null ||
-        json['userId'] == null ||
-        json['equipment'] == null) {
-      throw ArgumentError('Faltan campos obligatorios en el JSON.');
+    TimeOfDay parseTime(dynamic time) {
+      if (time is Map<String, dynamic>) {
+        return TimeOfDay(hour: time['hour'], minute: time['minute']);
+      } else if (time is String) {
+        final parts = time.split(':');
+        return TimeOfDay(
+          hour: int.parse(parts[0]),
+          minute: int.parse(parts[1]),
+        );
+      } else {
+        throw ArgumentError('Formato inválido para startTime o endTime');
+      }
     }
-
-    final startTimeParts = (json['startTime'] ?? '00:00').split(':');
-    final endTimeParts = (json['endTime'] ?? '00:00').split(':');
 
     return Event(
       id: json['id'] ?? 'unknown',
-      title: json['title'],
+      title: json['title'] ?? '',
       date: DateTime.parse(json['date']),
-      startTime: TimeOfDay(
-        hour: int.parse(startTimeParts[0]),
-        minute: int.parse(startTimeParts[1]),
-      ),
-      endTime: TimeOfDay(
-        hour: int.parse(endTimeParts[0]),
-        minute: int.parse(endTimeParts[1]),
-      ),
-      color: Color(json['color']),
-      userId: json['userId'],
-      equipment: json['equipment'],
+      startTime: parseTime(json['startTime']),
+      endTime: parseTime(json['endTime']),
+      color: Color(json['color'] ?? 0xFF000000),
+      userId: json['userId'] ?? '',
+      equipment: json['equipment'] ?? '',
       data: json['data'] ?? '',
     );
   }
 
   static Event fromMap(Map<String, dynamic> map) {
-    final startTimeParts = (map['startTime'] ?? '00:00').split(':');
-    final endTimeParts = (map['endTime'] ?? '00:00').split(':');
+    TimeOfDay parseTime(String time) {
+      final parts = time.split(':');
+      return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+    }
 
     return Event(
       id: map['id'] ?? 'unknown',
-      title: map['title'],
+      title: map['title'] ?? '',
       date: DateTime.parse(map['date']),
-      startTime: TimeOfDay(
-        hour: int.parse(startTimeParts[0]),
-        minute: int.parse(startTimeParts[1]),
-      ),
-      endTime: TimeOfDay(
-        hour: int.parse(endTimeParts[0]),
-        minute: int.parse(endTimeParts[1]),
-      ),
-      color: Color(map['color']),
-      userId: map['userId'],
-      equipment: map['equipment'],
+      startTime: parseTime(map['startTime'] ?? '00:00'),
+      endTime: parseTime(map['endTime'] ?? '00:00'),
+      color: Color(map['color'] ?? 0xFF000000),
+      userId: map['userId'] ?? '',
+      equipment: map['equipment'] ?? '',
       data: map['data'] ?? '',
     );
   }

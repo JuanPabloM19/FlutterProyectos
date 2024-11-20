@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/event_model.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
+import 'package:flutter_app_final/services/firebase_services.dart';
 import 'package:provider/provider.dart';
 import '../providers/event_provider.dart';
 
@@ -11,6 +12,8 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late Future<void> _loadDataFuture;
+  final firebaseServices =
+      FirebaseServices(); // Crea una instancia de FirebaseServices
 
   @override
   void initState() {
@@ -112,9 +115,23 @@ class _SettingsPageState extends State<SettingsPage> {
                             subtitle: Consumer<EventProvider>(
                               builder: (context, eventProvider, child) {
                                 return FutureBuilder<List<Event>>(
-                                  future: eventProvider.getEventsForDay(
-                                      DateTime.now(),
-                                      userId), // Asegúrate de pasar userId
+                                  future: firebaseServices
+                                      .getAllEvents(userId)
+                                      .then((events) {
+                                    // Filtrar los eventos localmente
+                                    return events.where((event) {
+                                      final eventDateOnly = DateTime(
+                                          event.date.year,
+                                          event.date.month,
+                                          event.date.day);
+                                      final todayOnly = DateTime(
+                                          DateTime.now().year,
+                                          DateTime.now().month,
+                                          DateTime.now().day);
+
+                                      return eventDateOnly == todayOnly;
+                                    }).toList();
+                                  }),
                                   builder: (context, snapshot) {
                                     if (snapshot.connectionState ==
                                         ConnectionState.waiting) {

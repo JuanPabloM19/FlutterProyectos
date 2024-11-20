@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_app_final/models/event_model.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -114,6 +115,24 @@ class DatabaseHelper {
     List<Map<String, dynamic>> users = await db.query('users');
     for (var user in users) {
       await _firestore.collection('users').doc(user['id'].toString()).set(user);
+
+      // Sincronizar los eventos con Firebase bajo cada usuario
+      List<Map<String, dynamic>> events = await db
+          .query('events', where: 'userId = ?', whereArgs: [user['id']]);
+      for (var event in events) {
+        if (event['id'] != null &&
+            event['equipmentId'] != null &&
+            event['userId'] != null) {
+          await _firestore
+              .collection('users')
+              .doc(user['id'].toString())
+              .collection('events')
+              .doc(event['id'].toString())
+              .set(event);
+        } else {
+          print('Error: Event contains null values: $event');
+        }
+      }
     }
 
     // Sincronizar equipos con Firebase
@@ -123,21 +142,6 @@ class DatabaseHelper {
           .collection('equipment')
           .doc(equip['id'].toString())
           .set(equip);
-    }
-
-    // Sincronizar eventos con Firebase
-    List<Map<String, dynamic>> events = await db.query('events');
-    for (var event in events) {
-      if (event['id'] != null &&
-          event['equipmentId'] != null &&
-          event['userId'] != null) {
-        await _firestore
-            .collection('events') // Cambiar a la colección `events`
-            .doc(event['id'].toString())
-            .set(event);
-      } else {
-        print('Error: Event contains null values: $event');
-      }
     }
   }
 
@@ -354,7 +358,6 @@ class DatabaseHelper {
     return result.isNotEmpty;
   }
 
-  // Obtener el nombre de usuario por ID
 // Obtener el nombre de usuario por ID
   Future<String> getUserName(int userId) async {
     final db = await database;
@@ -419,5 +422,32 @@ class DatabaseHelper {
     } else {
       await db.update('equipment', equipment, where: 'id = ?', whereArgs: [id]);
     }
+  }
+
+  Future<int> updateEvent(Event event) async {
+    final db = await database;
+
+    // Convierte la hora de inicio y fin a formato de String
+    String startTime =
+        DateTime(0, 0, 0, event.startTime.hour, event.startTime.minute)
+            .toIso8601String();
+    String endTime = DateTime(0, 0, 0, event.endTime.hour, event.endTime.minute)
+        .toIso8601String();
+
+    // Actualiza el evento en la tabla 'events'
+    return await db.update(
+      'events',
+      {
+        'name': event
+            .title, // Mapea `title` a `name`, ya que la columna `name` existe
+        'date': event.date.toIso8601String(),
+        'startTime': startTime,
+        'endTime': endTime,
+        'userId': event.userId,
+        'nameE': event.equipment, // Mapea `equipment` a `nameE`
+      },
+      where: 'id = ?',
+      whereArgs: [event.id],
+    );
   }
 }

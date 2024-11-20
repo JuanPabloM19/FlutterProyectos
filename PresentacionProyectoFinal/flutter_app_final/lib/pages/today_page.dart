@@ -291,7 +291,11 @@ class _CalendarPageState extends State<CalendarPage> {
       EventProvider eventProvider) async {
     if (isAdmin) {
       // Si es administrador, obtener todos los eventos
-      return eventProvider.getAllEventsForDay(_selectedDate);
+      return eventProvider.getAllEventsForDay(
+        _selectedDate,
+        isAdmin: isAdmin,
+        buildContext: context, // Pasa el contexto aquí
+      );
     } else {
       // Obtener el userId desde Firebase Authentication (o de donde corresponda)
       final userId = await _getUserId();
@@ -437,38 +441,39 @@ class _CalendarPageState extends State<CalendarPage> {
     // Mostrar diálogo de confirmación
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Eliminar Evento'),
-          content:
-              const Text('¿Estás seguro de que deseas eliminar este evento?'),
-          actions: <Widget>[
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF80B3FF),
-                foregroundColor: Color(0xFF010618),
-              ),
-              child: const Text('Cancelar'),
-              onPressed: () => Navigator.of(context).pop(),
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Eliminar Evento'),
+        content:
+            const Text('¿Estás seguro de que deseas eliminar este evento?'),
+        actions: [
+          TextButton(
+            child: const Text('Cancelar'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color.fromARGB(255, 228, 25, 10),
-                foregroundColor: Colors.white,
-                textStyle: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              child: const Text('Eliminar'),
-              onPressed: () {
-                eventProvider.deleteEvent(context, event.date, event);
+            child: const Text('Eliminar'),
+            onPressed: () async {
+              try {
+                await eventProvider.deleteEvent(context, event.date, event);
+                Navigator.of(context).pop(); // Cerrar diálogo
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Evento eliminado')),
+                  const SnackBar(
+                      content: Text('Evento eliminado exitosamente')),
                 );
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
+              } catch (e) {
+                print("Error al eliminar evento: $e");
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Error al eliminar el evento')),
+                );
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 

@@ -1,10 +1,11 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/event_model.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'today_page.dart'; // Asegúrate de que la importación sea correcta
+import 'today_page.dart';
 
 class RentalListPage extends StatefulWidget {
   @override
@@ -14,168 +15,128 @@ class RentalListPage extends StatefulWidget {
 class _RentalListPageState extends State<RentalListPage> {
   bool _isLoading = true;
   String _errorMessage = '';
+  Map<DateTime, List<Event>> _eventsByDay = {};
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadData(); // Cargar datos al iniciar
   }
 
   Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+      _eventsByDay.clear(); // Limpiar antes de recargar
+    });
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
     try {
-      await Future.wait([
-        eventProvider.fetchEvents(),
-        userProvider.loadAllUsers(),
-      ]);
-      setState(() {
-        _isLoading = false;
+      final isAdmin = userProvider.isAdmin;
+      final today = DateTime.now();
+      final daysOfWeek = List.generate(7, (index) {
+        final adjustedDay =
+            today.add(Duration(days: index - today.weekday + 1));
+        return DateTime(adjustedDay.year, adjustedDay.month, adjustedDay.day);
       });
+
+      for (var day in daysOfWeek) {
+        final eventsForDay = await eventProvider.getAllEventsForDay(
+          day,
+          isAdmin: isAdmin,
+          buildContext: context,
+        );
+        setState(() {
+          _eventsByDay[day] = eventsForDay; // Agregar eventos para cada día
+        });
+      }
     } catch (e) {
       setState(() {
-        _isLoading = false;
         _errorMessage = 'Error al cargar los datos: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final eventProvider = Provider.of<EventProvider>(context);
     final userProvider = Provider.of<UserProvider>(context);
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: Text('Listado de Alquileres')),
-        body: Center(child: CircularProgressIndicator()),
+        appBar: AppBar(title: const Text('Listado de Alquileres')),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
-
     if (_errorMessage.isNotEmpty) {
       return Scaffold(
-        appBar: AppBar(title: Text('Listado de Alquileres')),
+        appBar: AppBar(title: const Text('Listado de Alquileres')),
         body: Center(child: Text(_errorMessage)),
       );
     }
 
-    return _buildRentalList(context, eventProvider, userProvider);
-  }
-
-  Widget _buildRentalList(BuildContext context, EventProvider eventProvider,
-      UserProvider userProvider) {
-    final isAdmin = userProvider.isAdmin;
-    final List<String> daysOfWeek = [
-      'Lunes',
-      'Martes',
-      'Miércoles',
-      'Jueves',
-      'Viernes',
-      'Sábado',
-      'Domingo'
-    ];
-
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Center(child: Text('Listado de Alquileres')),
-        backgroundColor: Color(0xFF010618),
+        title: const Center(child: Text('Listado de Alquileres')),
+        backgroundColor: const Color(0xFF010618),
         foregroundColor: Colors.white,
       ),
       body: Container(
-        color: Color(0xFF010618),
+        color: const Color(0xFF010618),
         child: ListView(
-          children: daysOfWeek.map((day) {
-            int dayIndex = daysOfWeek.indexOf(day) + 1;
-            DateTime today = DateTime.now();
-            DateTime dayDate = today;
-
-            if (today.weekday > dayIndex) {
-              dayDate =
-                  today.add(Duration(days: (7 - today.weekday + dayIndex)));
-            } else if (today.weekday < dayIndex) {
-              dayDate = today.add(Duration(days: (dayIndex - today.weekday)));
-            }
-
+          children: _eventsByDay.entries.map((entry) {
+            DateTime dayDate = entry.key;
+            List<Event> eventsForDay = entry.value;
             final dayLabel =
                 "${DateFormat('EEEE', 'es').format(dayDate)} ${dayDate.day}";
-            final isToday = dayDate.day == today.day &&
-                dayDate.month == today.month &&
-                dayDate.year == today.year;
-
-            return FutureBuilder<List<Event>>(
-              future: isAdmin
-                  ? eventProvider.getAllEventsForDay(dayDate)
-                  : Future.value([]), // Si no es admin, no cargamos eventos
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(child: Text("Error: ${snapshot.error}"));
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Text(
-                          dayLabel.toUpperCase(),
-                          style: TextStyle(
-                            color: isToday ? Colors.green : Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const Divider(color: Colors.white),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Text('No hay alquileres para este día.',
-                              style: TextStyle(color: Colors.white70)),
-                        ),
-                      ),
-                    ],
-                  );
-                }
-
-                List<Event> eventsForDay = snapshot.data!;
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Text(
-                        dayLabel.toUpperCase(),
-                        style: TextStyle(
-                          color: isToday ? Colors.green : Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+            final isToday = dayDate.day == DateTime.now().day &&
+                dayDate.month == DateTime.now().month &&
+                dayDate.year == DateTime.now().year;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Text(
+                    dayLabel.toUpperCase(),
+                    style: TextStyle(
+                      color: isToday ? Colors.green : Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const Divider(color: Colors.white),
-                    ...eventsForDay.map((event) {
-                      final userName =
-                          userProvider.getUserNameById(event.userId);
-                      return ListTile(
-                        title: Text('Usuario: $userName',
-                            style: TextStyle(color: Colors.white)),
-                        subtitle: Text(
-                          'Equipo: ${event.equipment}\nHorario: ${event.startTime.format(context)} a ${event.endTime.format(context)}',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        tileColor: Colors.green.withOpacity(0.1),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.0)),
-                      );
-                    }).toList(),
-                  ],
-                );
-              },
+                  ),
+                ),
+                const Divider(color: Colors.white),
+                if (eventsForDay.isEmpty)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text('No hay alquileres para este día.',
+                          style: TextStyle(color: Colors.white70)),
+                    ),
+                  )
+                else
+                  ...eventsForDay.map((event) {
+                    final userName = userProvider.getUserNameById(event.userId);
+                    return ListTile(
+                      title: Text('Usuario: $userName',
+                          style: const TextStyle(color: Colors.white)),
+                      subtitle: Text(
+                        'Equipo: ${event.equipment}\nHorario: ${event.startTime.format(context)} a ${event.endTime.format(context)}',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                      tileColor: Colors.green.withOpacity(0.1),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.0)),
+                    );
+                  }).toList(),
+              ],
             );
           }).toList(),
         ),
@@ -186,20 +147,55 @@ class _RentalListPageState extends State<RentalListPage> {
           FloatingActionButton(
             onPressed: () {
               Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const CalendarPage()));
+                context,
+                MaterialPageRoute(builder: (context) => const CalendarPage()),
+              );
             },
-            backgroundColor: Color(0xFF80B3FF),
-            child: Icon(Icons.add, color: Color(0xFF010618)),
+            backgroundColor: const Color(0xFF80B3FF),
+            child: const Icon(Icons.add, color: Color(0xFF010618)),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           FloatingActionButton(
-            onPressed: () {
-              _loadData();
+            onPressed: () async {
+              final eventProvider =
+                  Provider.of<EventProvider>(context, listen: false);
+              final userProvider =
+                  Provider.of<UserProvider>(context, listen: false);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Actualizando eventos...'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+
+              try {
+                final isAdmin = userProvider.isAdmin;
+                if (isAdmin) {
+                  await eventProvider.fetchEvents(isAdmin: true);
+                } else {
+                  final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+                  await eventProvider.fetchUserEventsFromFirebase(
+                      context, userId);
+                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Eventos actualizados correctamente'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+                _loadData(); // Recargar vista
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error al actualizar eventos: $e'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
             },
-            backgroundColor: Color(0xFF80B3FF),
-            child: Icon(Icons.refresh, color: Color(0xFF010618)),
+            backgroundColor: const Color(0xFF80B3FF),
+            child: const Icon(Icons.refresh, color: Color(0xFF010618)),
           ),
         ],
       ),

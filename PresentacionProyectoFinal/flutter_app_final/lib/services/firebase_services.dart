@@ -33,7 +33,13 @@ class FirebaseServices {
 // Método para eliminar un evento
   Future<void> deleteEvent(String userId, Event event) async {
     try {
-      await _firestore.collection('events').doc(event.id).delete();
+      // Ruta correcta según tu estructura
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('events')
+          .doc(event.id)
+          .delete();
       print('Evento eliminado exitosamente');
     } catch (e) {
       print('Error al eliminar evento: $e');
@@ -41,19 +47,42 @@ class FirebaseServices {
     }
   }
 
-// Método para actualizar un evento
   Future<void> updateEvent(
       Event event, Event updatedEvent, BuildContext context) async {
-    try {
-      await _firestore
-          .collection('events')
-          .doc(event.id) // Usamos el ID del evento
-          .update(updatedEvent.toJson(
-              context)); // Usamos el método toJson de updatedEvent, pasando el BuildContext
-      print('Evento actualizado exitosamente');
-    } catch (e) {
-      print('Error al actualizar evento: $e');
-      throw e;
+    if (event.id.isEmpty) {
+      throw Exception(
+          "El ID del evento está vacío. Verifica que se haya asignado correctamente.");
+    }
+
+    // Asegurarse de que el userId esté presente
+    if (event.userId.isEmpty) {
+      throw Exception(
+          "El ID del usuario está vacío. No se puede encontrar la ruta del evento.");
+    }
+
+    // Referenciar la ruta correcta en Firestore
+    final docRef = _firestore
+        .collection('users')
+        .doc(event.userId)
+        .collection('events')
+        .doc(event.id);
+
+    final docSnapshot = await docRef.get();
+
+    if (!docSnapshot.exists) {
+      throw Exception("No se encontró el documento con ID: ${event.id}");
+    }
+
+    // Actualizamos el evento en Firestore
+    await docRef.update(updatedEvent.toJson(context));
+    print('Evento actualizado exitosamente en Firestore');
+
+    // Actualizamos el evento en la base de datos local
+    final result = await _dbHelper.updateEvent(updatedEvent);
+    if (result > 0) {
+      print('Evento actualizado exitosamente en SQLite');
+    } else {
+      throw Exception("Error al actualizar el evento en SQLite");
     }
   }
 
@@ -222,8 +251,16 @@ class FirebaseServices {
 
   // Verificar si un usuario es administrador
   Future<bool> isAdmin(String userId) async {
-    var userDoc = await _firestore.collection('users').doc(userId).get();
-    return userDoc.exists && userDoc['isAdmin'] == 1;
+    try {
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      return userDoc.exists && userDoc['isAdmin'] == 1;
+    } catch (e) {
+      print("Error al verificar si el usuario es admin: $e");
+      return false;
+    }
   }
 
   // Obtener el nombre de un usuario por ID
@@ -264,7 +301,7 @@ class FirebaseServices {
         return;
       }
 
-      // Referencia a la colección de eventos del usuario
+      // Referencia a la subcolección de eventos del usuario
       CollectionReference userEventsRef =
           _firestore.collection('users').doc(userId).collection('events');
 
@@ -273,48 +310,38 @@ class FirebaseServices {
 
       for (var event in events) {
         if (event.id.isEmpty) {
-          event.id = userEventsRef.doc().id; // Generar ID si no existe
+          event.id = userEventsRef.doc().id; // Generar un nuevo ID
         }
 
-        final eventData = event.toJson(context);
-        if (eventData.isNotEmpty) {
-          batch.set(userEventsRef.doc(event.id), eventData);
-        } else {
-          print("Advertencia: Datos del evento vacíos o nulos");
-        }
+        batch.set(userEventsRef.doc(event.id), event.toJson(context));
       }
 
-      // Ejecutar la transacción
       await batch.commit();
-      print("Eventos guardados correctamente");
+      print("Eventos guardados correctamente para el usuario $userId");
     } catch (e) {
-      print("Error al guardar eventos: $e");
+      print("Error al guardar los eventos: $e");
     }
   }
 
   // Obtener todos los eventos de un usuario
   Future<List<Event>> getAllEvents(String userId) async {
-    if (userId.isEmpty) {
-      throw Exception(
-          'El userId está vacío. Verifica que el usuario esté autenticado.');
-    }
-
     try {
-      List<Event> events = [];
-      QuerySnapshot querySnapshot = await _firestore
+      print("Buscando eventos para UID: $userId");
+
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
           .collection('events')
           .get();
 
-      for (var doc in querySnapshot.docs) {
-        var eventData = doc.data() as Map<String, dynamic>;
-        events.add(Event.fromJson(eventData));
-      }
+      final List<Event> events = snapshot.docs.map((doc) {
+        print("Evento encontrado: ${doc.data()}");
+        return Event.fromJson(doc.data() as Map<String, dynamic>);
+      }).toList();
 
       return events;
     } catch (e) {
-      print("Error al obtener eventos: $e");
+      print("Error al obtener eventos de Firestore: $e");
       return [];
     }
   }
@@ -385,5 +412,67 @@ class FirebaseServices {
       print("Error al obtener el nombre del usuario: $e");
       return null;
     }
+  }
+
+  Future<void> printAllEvents(String userId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('events')
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        print("No hay eventos almacenados en Firestore para el usuario.");
+      } else {
+        for (var doc in querySnapshot.docs) {
+          print("Evento: ${doc.data()}");
+        }
+      }
+    } catch (e) {
+      print("Error al imprimir eventos: $e");
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getUserEvents(String userId) async {
+    try {
+      QuerySnapshot querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('events')
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => doc.data() as Map<String, dynamic>)
+          .toList();
+    } catch (e) {
+      print("Error al obtener los eventos: $e");
+      return [];
+    }
+  }
+
+  Future<List<Event>> getAllAdminEvents() async {
+    List<Event> allEvents = [];
+    try {
+      QuerySnapshot usersSnapshot = await _firestore.collection('users').get();
+
+      for (var userDoc in usersSnapshot.docs) {
+        var eventsRef = userDoc.reference.collection('events');
+        QuerySnapshot eventsSnapshot = await eventsRef.get();
+
+        if (eventsSnapshot.docs.isEmpty) {
+          print("El usuario ${userDoc.id} no tiene eventos.");
+          continue;
+        }
+
+        for (var eventDoc in eventsSnapshot.docs) {
+          Event event = Event.fromJson(eventDoc.data() as Map<String, dynamic>);
+          allEvents.add(event);
+        }
+      }
+    } catch (e) {
+      print("Error al obtener eventos para administrador: $e");
+    }
+    return allEvents;
   }
 }
