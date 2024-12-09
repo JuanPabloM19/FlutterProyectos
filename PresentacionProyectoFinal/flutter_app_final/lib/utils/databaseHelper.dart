@@ -123,9 +123,16 @@ class DatabaseHelper {
         if (event['id'] != null &&
             event['equipmentId'] != null &&
             event['userId'] != null) {
+          // Subir a la subcolección bajo el usuario
           await _firestore
               .collection('users')
               .doc(user['id'].toString())
+              .collection('events')
+              .doc(event['id'].toString())
+              .set(event);
+
+          // Subir también a la colección general "events"
+          await _firestore
               .collection('events')
               .doc(event['id'].toString())
               .set(event);

@@ -61,6 +61,7 @@ class UserProvider with ChangeNotifier {
         _email = user['email'];
         _userId = user['userId'].toString(); // Asegúrate de convertir a String
         _isAdmin = user['isAdmin'] == 1;
+        print('Admin status: $_isAdmin');
         notifyListeners();
       } else {
         _name = 'Nombre Desconocido';

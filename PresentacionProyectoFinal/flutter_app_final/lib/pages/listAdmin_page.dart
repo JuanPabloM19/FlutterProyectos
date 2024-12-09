@@ -1,11 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/event_model.dart';
+import 'package:flutter_app_final/pages/today_page.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
+import 'package:flutter_app_final/services/firebase_services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'today_page.dart';
 
 class RentalListPage extends StatefulWidget {
   @override
@@ -27,28 +28,35 @@ class _RentalListPageState extends State<RentalListPage> {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
-      _eventsByDay.clear(); // Limpiar antes de recargar
+      _eventsByDay.clear();
     });
+
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
     try {
       final isAdmin = userProvider.isAdmin;
-      final today = DateTime.now();
-      final daysOfWeek = List.generate(7, (index) {
-        final adjustedDay =
-            today.add(Duration(days: index - today.weekday + 1));
-        return DateTime(adjustedDay.year, adjustedDay.month, adjustedDay.day);
-      });
 
-      for (var day in daysOfWeek) {
-        final eventsForDay = await eventProvider.getAllEventsForDay(
-          day,
-          isAdmin: isAdmin,
-          buildContext: context,
-        );
+      if (isAdmin) {
+        final firebaseServices = FirebaseServices();
+        final allEvents = await firebaseServices.getAllEventsForAdmin();
+
+        // Agrupar los eventos por día
+        final Map<DateTime, List<Event>> eventsByDay = {};
+        for (var eventData in allEvents) {
+          final eventDate =
+              DateTime.parse(eventData['date']).toLocal(); // ⚠️ Importante
+          final dayKey =
+              DateTime(eventDate.year, eventDate.month, eventDate.day);
+
+          // Asegurar la creación de la lista antes de añadir
+          eventsByDay
+              .putIfAbsent(dayKey, () => [])
+              .add(Event.fromJson(eventData));
+        }
+
         setState(() {
-          _eventsByDay[day] = eventsForDay; // Agregar eventos para cada día
+          _eventsByDay = eventsByDay;
         });
       }
     } catch (e) {
@@ -91,12 +99,14 @@ class _RentalListPageState extends State<RentalListPage> {
         child: ListView(
           children: _eventsByDay.entries.map((entry) {
             DateTime dayDate = entry.key;
-            List<Event> eventsForDay = entry.value;
+            List<Event> eventsForDay = entry.value ?? [];
+
             final dayLabel =
                 "${DateFormat('EEEE', 'es').format(dayDate)} ${dayDate.day}";
             final isToday = dayDate.day == DateTime.now().day &&
                 dayDate.month == DateTime.now().month &&
                 dayDate.year == DateTime.now().year;
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -117,18 +127,39 @@ class _RentalListPageState extends State<RentalListPage> {
                     margin: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text('No hay alquileres para este día.',
-                          style: TextStyle(color: Colors.white70)),
+                      child: Text(
+                        'No hay alquileres para este día.',
+                        style: TextStyle(color: Colors.white70),
+                      ),
                     ),
                   )
                 else
                   ...eventsForDay.map((event) {
-                    final userName = userProvider.getUserNameById(event.userId);
+                    final userName =
+                        userProvider.getUserNameById(event.userId) ??
+                            'Usuario desconocido';
+
+                    // Crear DateTime temporal para formatear la hora
+                    DateTime startDateTime = DateTime(
+                      DateTime.now().year,
+                      DateTime.now().month,
+                      DateTime.now().day,
+                      event.startTime.hour,
+                      event.startTime.minute,
+                    );
+                    DateTime endDateTime = DateTime(
+                      DateTime.now().year,
+                      DateTime.now().month,
+                      DateTime.now().day,
+                      event.endTime.hour,
+                      event.endTime.minute,
+                    );
+
                     return ListTile(
                       title: Text('Usuario: $userName',
                           style: const TextStyle(color: Colors.white)),
                       subtitle: Text(
-                        'Equipo: ${event.equipment}\nHorario: ${event.startTime.format(context)} a ${event.endTime.format(context)}',
+                        'Equipo: ${event.equipment}\nHorario: ${DateFormat('HH:mm').format(startDateTime)} a ${DateFormat('HH:mm').format(endDateTime)}',
                         style: const TextStyle(color: Colors.white70),
                       ),
                       tileColor: Colors.green.withOpacity(0.1),
@@ -145,6 +176,7 @@ class _RentalListPageState extends State<RentalListPage> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton(
+            heroTag: 'addEvent', // Asignar un tag único
             onPressed: () {
               Navigator.push(
                 context,
@@ -156,6 +188,7 @@ class _RentalListPageState extends State<RentalListPage> {
           ),
           const SizedBox(height: 16),
           FloatingActionButton(
+            heroTag: 'refreshEvents', // Asignar otro tag único
             onPressed: () async {
               final eventProvider =
                   Provider.of<EventProvider>(context, listen: false);
@@ -172,19 +205,19 @@ class _RentalListPageState extends State<RentalListPage> {
               try {
                 final isAdmin = userProvider.isAdmin;
                 if (isAdmin) {
-                  await eventProvider.fetchEvents(isAdmin: true);
+                  eventProvider.fetchEvents(isAdmin: true);
                 } else {
                   final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-                  await eventProvider.fetchUserEventsFromFirebase(
-                      context, userId);
+                  eventProvider.fetchUserEventsFromFirebase(context, userId);
                 }
+                _loadData(); // Recargar vista después de actualizar los datos
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Eventos actualizados correctamente'),
                     duration: Duration(seconds: 2),
                   ),
                 );
-                _loadData(); // Recargar vista
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

@@ -74,7 +74,7 @@ class FirebaseServices {
     }
 
     // Actualizamos el evento en Firestore
-    await docRef.update(updatedEvent.toJson(context));
+    await docRef.update(updatedEvent.toJson());
     print('Evento actualizado exitosamente en Firestore');
 
     // Actualizamos el evento en la base de datos local
@@ -179,10 +179,7 @@ class FirebaseServices {
       );
 
       // Guardar el evento en Firestore
-      await _firestore
-          .collection('events')
-          .doc(eventId)
-          .set(newEvent.toJson(context));
+      await _firestore.collection('events').doc(eventId).set(newEvent.toJson());
 
       return true;
     } catch (e) {
@@ -313,7 +310,7 @@ class FirebaseServices {
           event.id = userEventsRef.doc().id; // Generar un nuevo ID
         }
 
-        batch.set(userEventsRef.doc(event.id), event.toJson(context));
+        batch.set(userEventsRef.doc(event.id), event.toJson());
       }
 
       await batch.commit();
@@ -323,12 +320,11 @@ class FirebaseServices {
     }
   }
 
-  // Obtener todos los eventos de un usuario
+  /// Obtener todos los eventos de un usuario normal
   Future<List<Event>> getAllEvents(String userId) async {
     try {
       print("Buscando eventos para UID: $userId");
-
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
+      QuerySnapshot snapshot = await _firestore
           .collection('users')
           .doc(userId)
           .collection('events')
@@ -336,7 +332,7 @@ class FirebaseServices {
 
       final List<Event> events = snapshot.docs.map((doc) {
         print("Evento encontrado: ${doc.data()}");
-        return Event.fromJson(doc.data() as Map<String, dynamic>);
+        return Event.fromFirestore(doc); // Usar fromFirestore aquí
       }).toList();
 
       return events;
@@ -414,6 +410,7 @@ class FirebaseServices {
     }
   }
 
+  // Imprimir todos los eventos de un usuario (para depuración)
   Future<void> printAllEvents(String userId) async {
     try {
       final querySnapshot = await _firestore
@@ -434,6 +431,7 @@ class FirebaseServices {
     }
   }
 
+  // Obtener los eventos de un usuario específico
   Future<List<Map<String, dynamic>>> getUserEvents(String userId) async {
     try {
       QuerySnapshot querySnapshot = await _firestore
@@ -451,9 +449,11 @@ class FirebaseServices {
     }
   }
 
+  // Obtener todos los eventos para el administrador
   Future<List<Event>> getAllAdminEvents() async {
     List<Event> allEvents = [];
     try {
+      // Obtener todos los usuarios
       QuerySnapshot usersSnapshot = await _firestore.collection('users').get();
 
       for (var userDoc in usersSnapshot.docs) {
@@ -466,7 +466,7 @@ class FirebaseServices {
         }
 
         for (var eventDoc in eventsSnapshot.docs) {
-          Event event = Event.fromJson(eventDoc.data() as Map<String, dynamic>);
+          Event event = Event.fromFirestore(eventDoc); // Usar fromFirestore
           allEvents.add(event);
         }
       }
@@ -474,5 +474,19 @@ class FirebaseServices {
       print("Error al obtener eventos para administrador: $e");
     }
     return allEvents;
+  }
+
+// Obtener todos los eventos para el administrador
+  Future<List<Map<String, dynamic>>> getAllEventsForAdmin() async {
+    try {
+      QuerySnapshot querySnapshot = await _firestore.collection('events').get();
+      List<Map<String, dynamic>> eventsList = querySnapshot.docs
+          .map((doc) => doc.data() as Map<String, dynamic>)
+          .toList();
+      return eventsList;
+    } catch (e) {
+      print("Error al obtener todos los eventos: $e");
+      return [];
+    }
   }
 }

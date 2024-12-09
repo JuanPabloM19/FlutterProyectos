@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/equipment_model.dart';
 import 'package:flutter_app_final/models/event_model.dart';
@@ -42,16 +43,25 @@ class _CalendarPageState extends State<CalendarPage> {
   String? userName;
   DateTime _selectedDate = DateTime.now();
   List<Event> events = [];
+  Map<DateTime, List<Event>> eventsByDay = {};
+  List<Event> allEvents = []; // Lista de todos los eventos
+  // Mapa de eventos agrupados por día
 
   @override
   void initState() {
     super.initState();
     _selectedDay = DateTime.now();
-    _loadAdminStatus();
-    _loadUserId();
-    _loadUserName();
-    _loadEvents(); // Cargar los eventos al iniciar// Inicializamos la lista de eventos
+    _loadUserName(); // Cargar los eventos al iniciar// Inicializamos la lista de eventos
+    _loadInitialData();
+    _loadSelectedEvents(_focusedDay);
+    _loadAllEvents(); // Asegurarse de cargar todos los eventos al inicio
     Provider.of<EventProvider>(context, listen: false).loadEvents();
+  }
+
+  Future<void> _loadInitialData() async {
+    await _loadUserId();
+    await _loadAdminStatus();
+    await _loadEvents(_focusedDay);
   }
 
   Future<void> _loadAdminStatus() async {
@@ -67,6 +77,38 @@ class _CalendarPageState extends State<CalendarPage> {
       setState(() {
         userName = name;
       });
+    }
+  }
+
+  Future<void> _loadUserId() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userId = prefs.getString('userId');
+    });
+  }
+
+  Future<void> _loadAllEvents() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final userId = userProvider.userId; // Obtener el userId desde UserProvider
+
+    if (userId != null) {
+      final List<Event> fetchedEvents = await FirebaseServices()
+          .getAllEvents(userId); // Obtener los eventos de Firestore
+
+      setState(() {
+        allEvents = fetchedEvents;
+        eventsByDay = {};
+        for (var event in allEvents) {
+          DateTime eventDate =
+              DateTime(event.date.year, event.date.month, event.date.day);
+          if (!eventsByDay.containsKey(eventDate)) {
+            eventsByDay[eventDate] = [];
+          }
+          eventsByDay[eventDate]!.add(event);
+        }
+      });
+    } else {
+      print('Error: No se pudo cargar el userId desde UserProvider');
     }
   }
 
@@ -97,14 +139,11 @@ class _CalendarPageState extends State<CalendarPage> {
                 setState(() {
                   _selectedDay = selectedDay;
                   _focusedDay = focusedDay;
-                  _selectedDate = selectedDay;
-                  _loadSelectedEvents(); // Cargar eventos para el día seleccionado
                 });
               },
               eventLoader: (day) {
-                return events
-                    .where((event) => isSameDay(event.date, day))
-                    .toList();
+                DateTime normalizedDay = DateTime(day.year, day.month, day.day);
+                return eventsByDay[normalizedDay] ?? [];
               },
               calendarBuilders: CalendarBuilders(
                 dowBuilder: (context, day) {
@@ -144,8 +183,7 @@ class _CalendarPageState extends State<CalendarPage> {
                           width: 10.0,
                           height: 10.0,
                           decoration: BoxDecoration(
-                            color:
-                                Colors.blue, // Color fijo para todos los puntos
+                            color: Colors.blue,
                             shape: BoxShape.circle,
                           ),
                         );
@@ -184,8 +222,9 @@ class _CalendarPageState extends State<CalendarPage> {
             const SizedBox(height: 8.0),
             Expanded(
               child: FutureBuilder<List<Event>>(
-                future: _getEventsForSelectedDay(
-                    eventProvider), // Usamos la función para obtener eventos
+                future: eventProvider.getAllEventsForDay(
+                    _selectedDay ?? DateTime.now(),
+                    isAdmin: isAdmin),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -193,30 +232,18 @@ class _CalendarPageState extends State<CalendarPage> {
                     return Center(child: Text('Error: ${snapshot.error}'));
                   } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                     return const Center(
-                      child: Text(
-                        'No hay eventos para hoy.',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    );
+                        child: Text(
+                      'No hay eventos para hoy.',
+                      style: TextStyle(color: Colors.white),
+                    ));
                   }
 
                   final events = snapshot.data!;
-
                   return ListView.builder(
                     itemCount: events.length,
                     itemBuilder: (context, index) {
                       final event = events[index];
                       return ListTile(
-                        leading: Container(
-                          width: 10.0,
-                          height: 10.0,
-                          decoration: BoxDecoration(
-                            color: event.color ??
-                                Colors
-                                    .blue, // Usa el color del evento, si no, usa azul
-                            shape: BoxShape.circle,
-                          ),
-                        ),
                         title: Text(
                           event.equipment,
                           style: const TextStyle(color: Colors.white),
@@ -274,17 +301,24 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   // Cargar eventos para el día seleccionado
-  Future<List<Event>> _loadSelectedEvents() async {
+  Future<void> _loadSelectedEvents(DateTime selectedDay) async {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
-    final userId = _userId ?? '';
+    final user = FirebaseAuth.instance.currentUser;
 
-    // Verifica si el usuario tiene eventos para el día seleccionado
-    return eventProvider.getEventsForDay(_selectedDate, userId);
+    if (user != null) {
+      final loadedEvents =
+          await eventProvider.getAllEventsForDay(selectedDay, isAdmin: isAdmin);
+      setState(() {
+        events = loadedEvents;
+      });
+    } else {
+      print('No se encontró usuario logueado.');
+    }
   }
 
   Future<String?> _getUserId() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.getString('userId'); // Obtener el ID del usuario logueado
+    final user = FirebaseAuth.instance.currentUser;
+    return user?.uid; // Devuelve el UID del usuario logueado
   }
 
   Future<List<Event>> _getEventsForSelectedDay(
@@ -294,7 +328,6 @@ class _CalendarPageState extends State<CalendarPage> {
       return eventProvider.getAllEventsForDay(
         _selectedDate,
         isAdmin: isAdmin,
-        buildContext: context, // Pasa el contexto aquí
       );
     } else {
       // Obtener el userId desde Firebase Authentication (o de donde corresponda)
@@ -664,26 +697,17 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
-  Future<void> _loadEvents() async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
+  Future<void> _loadEvents(DateTime day) async {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
-
-    if (userProvider.isAdmin) {
-      // Obtener todos los eventos para el día
-      events = await eventProvider.getAllEventsForDay(_focusedDay);
+    if (isAdmin) {
+      // Si es admin, carga todos los eventos del día
+      events = await eventProvider.getAllEventsForDay(day);
     } else {
-      // Obtener los eventos del usuario para ese día
-      final userId = _userId ?? ""; // Usa el userId cargado en el estado
-      events = await eventProvider.getEventsForDay(_focusedDay, userId);
+      // Si no es admin, carga solo los eventos del usuario
+      if (_userId != null) {
+        events = await eventProvider.getEventsForDay(day, _userId!);
+      }
     }
-
-    setState(() {}); // Actualizar el estado con los eventos cargados
-  }
-
-  Future<void> _loadUserId() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _userId = prefs.getString('userId');
-    });
+    setState(() {}); // Actualizar la interfaz con los nuevos eventos
   }
 }

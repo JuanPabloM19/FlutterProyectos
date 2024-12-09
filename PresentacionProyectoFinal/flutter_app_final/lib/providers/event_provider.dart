@@ -29,25 +29,38 @@ class EventProvider with ChangeNotifier {
   // Método para obtener todos los eventos de Firebase
   Future<void> fetchEvents({bool isAdmin = false}) async {
     try {
-      print("Iniciando fetchEvents para ${isAdmin ? 'admin' : 'usuario'}");
-
       if (isAdmin) {
-        // Obtener todos los eventos de todos los usuarios
-        _events = await _firebaseServices.getAllAdminEvents();
-      } else {
-        // Obtener eventos del usuario autenticado
-        String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-        if (userId.isEmpty) {
-          print("Error: Usuario no autenticado.");
-          return;
+        // Obtener todos los eventos de todos los usuarios para el admin
+        final querySnapshot =
+            await FirebaseFirestore.instance.collection('events').get();
+        if (querySnapshot.docs.isEmpty) {
+          print('No se encontraron eventos para cargar.');
+        } else {
+          _events = querySnapshot.docs
+              .map((doc) => Event.fromMap(doc.data()))
+              .toList();
+          notifyListeners();
         }
-        _events = await _firebaseServices.getAllEvents(userId);
-      }
+      } else {
+        final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+        // Obtener eventos del usuario actual
+        final querySnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('events')
+            .get();
 
-      print("Eventos cargados: ${_events.length}");
-      notifyListeners();
+        if (querySnapshot.docs.isEmpty) {
+          print('No se encontraron eventos para el usuario.');
+        } else {
+          _events = querySnapshot.docs
+              .map((doc) => Event.fromMap(doc.data()))
+              .toList();
+          notifyListeners();
+        }
+      }
     } catch (e) {
-      print("Error al obtener eventos: $e");
+      print('Error al obtener eventos: $e');
     }
   }
 
@@ -68,9 +81,18 @@ class EventProvider with ChangeNotifier {
   // Obtener eventos de Firebase y actualizar estado local
   Future<void> fetchUserEventsFromFirebase(
       BuildContext context, String userId) async {
-    final events = await _firebaseServices.getAllEvents(userId);
-    _userEvents[userId] = _groupEventsByDate(events);
-    notifyListeners();
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('events')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      _events =
+          querySnapshot.docs.map((doc) => Event.fromMap(doc.data())).toList();
+      notifyListeners(); // Notificar a la vista
+    } catch (e) {
+      print('Error al obtener eventos: $e');
+    }
   }
 
   List<Event> getEventsForDay(DateTime selectedDay, String userId) {
@@ -96,59 +118,56 @@ class EventProvider with ChangeNotifier {
   }
 
   Future<List<Event>> getAllEventsForDay(DateTime day,
-      {bool isAdmin = false, BuildContext? buildContext}) async {
+      {bool isAdmin = false}) async {
     try {
-      List<Event> eventsForDay = [];
+      final startOfDay = DateTime.utc(day.year, day.month, day.day);
+      final endOfDay = startOfDay
+          .add(const Duration(days: 1))
+          .subtract(Duration(seconds: 1)); // Hasta el final del día
+
+      final eventsForDay = <Event>[];
+
+      // Verificar si el usuario está autenticado
+      String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      if (userId.isEmpty) {
+        print("Usuario no autenticado");
+        return []; // Retorna una lista vacía si el usuario no está autenticado
+      }
 
       if (isAdmin) {
-        // Obtener eventos de todos los usuarios
-        QuerySnapshot usersSnapshot =
+        // Si es administrador, obtenemos todos los eventos de todos los usuarios
+        final usersSnapshot =
             await FirebaseFirestore.instance.collection('users').get();
-
         for (var userDoc in usersSnapshot.docs) {
-          // Obtener eventos de cada usuario
-          QuerySnapshot eventsSnapshot =
-              await userDoc.reference.collection('events').get();
+          final eventsSnapshot = await userDoc.reference
+              .collection('events')
+              .where('date',
+                  isGreaterThanOrEqualTo: startOfDay.toIso8601String())
+              .where('date', isLessThan: endOfDay.toIso8601String())
+              .get();
 
           for (var eventDoc in eventsSnapshot.docs) {
-            Event event =
-                Event.fromJson(eventDoc.data() as Map<String, dynamic>);
-
-            if (isSameDay(event.date, day)) {
-              eventsForDay.add(event);
-            }
+            eventsForDay.add(Event.fromFirestore(eventDoc));
           }
         }
       } else {
-        if (buildContext == null) {
-          throw ArgumentError(
-              'buildContext is required when isAdmin is false.');
-        }
-        // Usuario no administrador, obtener solo sus eventos
-        final userProvider =
-            Provider.of<UserProvider>(buildContext, listen: false);
-        String userId = userProvider.userId;
-
-        QuerySnapshot eventsSnapshot = await FirebaseFirestore.instance
+        // Si no es administrador, obtenemos solo los eventos del usuario logueado
+        final querySnapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(userId)
             .collection('events')
+            .where('date', isGreaterThanOrEqualTo: startOfDay.toIso8601String())
+            .where('date', isLessThan: endOfDay.toIso8601String())
             .get();
 
-        for (var eventDoc in eventsSnapshot.docs) {
-          final data = eventDoc.data() as Map<String, dynamic>;
-          if (data.isNotEmpty) {
-            Event event = Event.fromJson(data);
-            if (isSameDay(event.date, day)) {
-              eventsForDay.add(event);
-            }
-          }
+        for (var eventDoc in querySnapshot.docs) {
+          eventsForDay.add(Event.fromFirestore(eventDoc));
         }
       }
 
       return eventsForDay;
     } catch (e) {
-      print("Error al obtener eventos para el día: $e");
+      print("Error al obtener eventos: $e");
       return [];
     }
   }
@@ -349,6 +368,17 @@ class EventProvider with ChangeNotifier {
       await _firebaseServices.saveOccupiedTeams(_occupiedTeams);
     } catch (e) {
       print("Error al guardar equipos ocupados: $e");
+    }
+  }
+
+  // Método para obtener todos los eventos de todos los usuarios (solo para admin)
+  Future<void> fetchAllEventsForAdmin() async {
+    try {
+      final events = await _firebaseServices.getAllAdminEvents();
+      _events = events;
+      notifyListeners();
+    } catch (e) {
+      print("Error al obtener los eventos para el administrador: $e");
     }
   }
 }
