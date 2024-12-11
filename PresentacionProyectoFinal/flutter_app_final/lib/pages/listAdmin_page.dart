@@ -1,12 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/event_model.dart';
-import 'package:flutter_app_final/pages/today_page.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:flutter_app_final/services/firebase_services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'today_page.dart';
 
 class RentalListPage extends StatefulWidget {
   @override
@@ -16,7 +16,7 @@ class RentalListPage extends StatefulWidget {
 class _RentalListPageState extends State<RentalListPage> {
   bool _isLoading = true;
   String _errorMessage = '';
-  Map<DateTime, List<Event>> _eventsByDay = {};
+  Map<DateTime, List<Event>> _eventsByDay = {}; // Agrupar los eventos por día
 
   @override
   void initState() {
@@ -31,40 +31,50 @@ class _RentalListPageState extends State<RentalListPage> {
       _eventsByDay.clear();
     });
 
-    final eventProvider = Provider.of<EventProvider>(context, listen: false);
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-
     try {
-      final isAdmin = userProvider.isAdmin;
+      final user = FirebaseAuth.instance.currentUser;
 
-      if (isAdmin) {
-        final firebaseServices = FirebaseServices();
-        final allEvents = await firebaseServices.getAllEventsForAdmin();
-
-        // Agrupar los eventos por día
-        final Map<DateTime, List<Event>> eventsByDay = {};
-        for (var eventData in allEvents) {
-          final eventDate =
-              DateTime.parse(eventData['date']).toLocal(); // ⚠️ Importante
-          final dayKey =
-              DateTime(eventDate.year, eventDate.month, eventDate.day);
-
-          // Asegurar la creación de la lista antes de añadir
-          eventsByDay
-              .putIfAbsent(dayKey, () => [])
-              .add(Event.fromJson(eventData));
-        }
-
+      if (user == null) {
         setState(() {
-          _eventsByDay = eventsByDay;
+          _errorMessage = 'No se encontró el usuario autenticado.';
+          _isLoading = false;
         });
+        return;
       }
+
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final isAdmin = await userProvider.checkIfUserIsAdmin();
+
+      print('Usuario actual: ${user.uid}, es admin: $isAdmin');
+
+      final firebaseServices = FirebaseServices();
+      final List<Map<String, dynamic>> allEvents = isAdmin
+          ? await firebaseServices.getAllEventsForAdmin()
+          : await firebaseServices.getUserEvents(user.uid);
+
+      print('Eventos obtenidos: ${allEvents.length}');
+
+      final Map<DateTime, List<Event>> eventsByDay = {};
+      for (var event in allEvents) {
+        try {
+          final eventDate = DateTime.parse(event['date']).toLocal();
+          final dayKey =
+              DateTime(eventDate.year, eventDate.month, eventDate.day).toUtc();
+
+          eventsByDay.putIfAbsent(dayKey, () => []).add(Event.fromJson(event));
+        } catch (e) {
+          print('Error al convertir la fecha del evento: $e');
+        }
+      }
+
+      setState(() {
+        _eventsByDay = eventsByDay;
+        _isLoading = false;
+      });
     } catch (e) {
+      print('Error global en _loadData: $e');
       setState(() {
         _errorMessage = 'Error al cargar los datos: $e';
-      });
-    } finally {
-      setState(() {
         _isLoading = false;
       });
     }
@@ -80,6 +90,7 @@ class _RentalListPageState extends State<RentalListPage> {
         body: const Center(child: CircularProgressIndicator()),
       );
     }
+
     if (_errorMessage.isNotEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Listado de Alquileres')),
@@ -139,7 +150,6 @@ class _RentalListPageState extends State<RentalListPage> {
                         userProvider.getUserNameById(event.userId) ??
                             'Usuario desconocido';
 
-                    // Crear DateTime temporal para formatear la hora
                     DateTime startDateTime = DateTime(
                       DateTime.now().year,
                       DateTime.now().month,
@@ -176,25 +186,20 @@ class _RentalListPageState extends State<RentalListPage> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton(
-            heroTag: 'addEvent', // Asignar un tag único
+            heroTag: 'addEvent',
             onPressed: () {
               Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CalendarPage()),
-              );
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const CalendarPage()));
             },
             backgroundColor: const Color(0xFF80B3FF),
             child: const Icon(Icons.add, color: Color(0xFF010618)),
           ),
           const SizedBox(height: 16),
           FloatingActionButton(
-            heroTag: 'refreshEvents', // Asignar otro tag único
+            heroTag: 'refreshEvents',
             onPressed: () async {
-              final eventProvider =
-                  Provider.of<EventProvider>(context, listen: false);
-              final userProvider =
-                  Provider.of<UserProvider>(context, listen: false);
-
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Actualizando eventos...'),
@@ -203,15 +208,7 @@ class _RentalListPageState extends State<RentalListPage> {
               );
 
               try {
-                final isAdmin = userProvider.isAdmin;
-                if (isAdmin) {
-                  eventProvider.fetchEvents(isAdmin: true);
-                } else {
-                  final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-                  eventProvider.fetchUserEventsFromFirebase(context, userId);
-                }
-                _loadData(); // Recargar vista después de actualizar los datos
-
+                await _loadData();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Eventos actualizados correctamente'),

@@ -25,7 +25,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
 
-    await userProvider.loadAllUsers();
+    //await userProvider.loadAllUsers();
     await eventProvider.fetchEvents(); // Asegurarse de cargar los eventos
   }
 

@@ -14,16 +14,24 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
-class TodayPage extends StatelessWidget {
-  const TodayPage({super.key});
+class TodayPage extends StatefulWidget {
+  const TodayPage({Key? key}) : super(key: key);
+  @override
+  _TodayPageState createState() => _TodayPageState();
+}
+
+class _TodayPageState extends State<TodayPage> {
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<UserProvider>(context);
-    final isAdmin = userProvider.isAdmin;
-    return ChangeNotifierProvider(
-      create: (_) => EventProvider(),
-      child: isAdmin ? RentalListPage() : const CalendarPage(),
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
     );
   }
 }

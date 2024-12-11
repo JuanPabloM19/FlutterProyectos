@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
+import 'package:flutter_app_final/services/firebase_services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_app_final/utils/navigation_bar.dart';
@@ -127,29 +129,69 @@ class _InputPageState extends State<LoginPage> {
 
   void _login(BuildContext context) async {
     try {
-      // Usar Firebase Authentication para iniciar sesión
       UserCredential userCredential =
           await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _email,
         password: _password,
       );
 
-      // Obtener ID de usuario desde Firebase Auth
       String userId = userCredential.user!.uid;
 
-      // Cargar datos del usuario en el UserProvider
+      // Usar una vez que FirebaseAuth ya tenga al usuario autenticado
       Provider.of<UserProvider>(context, listen: false)
-          .loadUserData(_email, _password);
+          .loadUserData(_email, _password, context);
 
-      // Almacenar el ID del usuario en SharedPreferences
+      Provider.of<EventProvider>(context, listen: false).setUserId(userId);
+      print("UID asignado en Provider: $userId");
+
+      // ✅ Verificar si el usuario es administrador y obtener el resultado
+      bool isAdmin = await FirebaseServices().checkIfUserIsAdmin(userId);
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('userId', userId);
+      await prefs.setBool('isAdmin', isAdmin); // Guardar si el usuario es admin
 
-      _showSuccessDialog(context);
+      _showSuccessDialog(context, isAdmin); // Pasar "isAdmin" al dialogo
     } on FirebaseAuthException catch (e) {
-      // Mostrar un error si las credenciales no son correctas
       _showErrorDialog(context, e.message ?? "Error desconocido");
     }
+  }
+
+  void _showSuccessDialog(BuildContext context, bool isAdmin) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        Future.delayed(const Duration(seconds: 4), () {
+          Navigator.of(context).pop();
+
+          // Redirigir dependiendo del rol
+          if (isAdmin) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => MainPage(isAdmin: isAdmin)),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => MainPage(isAdmin: isAdmin)),
+            );
+          }
+        });
+
+        return const AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green),
+              SizedBox(width: 10),
+              Text("Éxito"),
+            ],
+          ),
+          content: Text("Inicio de sesión exitoso. Redirigiendo..."),
+        );
+      },
+    );
   }
 
   void _showErrorDialog(BuildContext context, String message) {
@@ -176,33 +218,6 @@ class _InputPageState extends State<LoginPage> {
               },
             ),
           ],
-        );
-      },
-    );
-  }
-
-  void _showSuccessDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        Future.delayed(const Duration(seconds: 4), () {
-          Navigator.of(context).pop();
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => MainPage()),
-          );
-        });
-
-        return const AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green),
-              SizedBox(width: 10),
-              Text("Éxito"),
-            ],
-          ),
-          content: Text("Inicio de sesión exitoso. Redirigiendo..."),
         );
       },
     );

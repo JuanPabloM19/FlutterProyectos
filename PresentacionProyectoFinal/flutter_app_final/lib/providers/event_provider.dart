@@ -18,12 +18,18 @@ class EventProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final UserProvider _userProvider =
       UserProvider(); // O accede a través de provider
-
+  String? _userId;
   List<Event> get events => _events;
 
   EventProvider() {
     loadEvents(); // Cargar eventos al inicializar
     _loadOccupiedTeams(); // Cargar equipos ocupados al inicializar
+  }
+
+  void setUserId(String userId) {
+    _userId = userId;
+    print(' UID asignado en Provider: $_userId');
+    fetchUserEventsFromFirebase(); // Llamar para obtener los eventos del usuario
   }
 
   // Método para obtener todos los eventos de Firebase
@@ -78,20 +84,29 @@ class EventProvider with ChangeNotifier {
     return groupedEvents;
   }
 
-  // Obtener eventos de Firebase y actualizar estado local
-  Future<void> fetchUserEventsFromFirebase(
-      BuildContext context, String userId) async {
+// Obtener eventos de Firebase y actualizar estado local
+  Future<void> fetchUserEventsFromFirebase() async {
+    if (_userId == null || _userId!.isEmpty) {
+      print(' Error: El UID es nulo o vacío. No se puede obtener eventos.');
+      return;
+    }
+
     try {
       final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_userId)
           .collection('events')
-          .where('userId', isEqualTo: userId)
           .get();
 
-      _events =
-          querySnapshot.docs.map((doc) => Event.fromMap(doc.data())).toList();
-      notifyListeners(); // Notificar a la vista
+      _events = querySnapshot.docs.map((doc) {
+        final eventData = doc.data();
+        return Event.fromMap(eventData);
+      }).toList();
+
+      print(' Eventos cargados correctamente: ${_events.length} eventos');
+      notifyListeners();
     } catch (e) {
-      print('Error al obtener eventos: $e');
+      print(' Error al obtener eventos para UID $_userId: $e');
     }
   }
 
@@ -179,7 +194,7 @@ class EventProvider with ChangeNotifier {
       await _firebaseServices.updateEvent(oldEvent, updatedEvent, context);
 
       // Refrescar eventos locales desde Firebase
-      await fetchUserEventsFromFirebase(context, updatedEvent.userId);
+      await fetchUserEventsFromFirebase();
     } catch (e) {
       print("Error al editar evento: $e");
     }
@@ -254,7 +269,7 @@ class EventProvider with ChangeNotifier {
       // Notificar a los widgets dependientes que los eventos han cambiado
       notifyListeners();
       // Recargar eventos desde Firebase para sincronizar
-      await fetchUserEventsFromFirebase(context, event.userId);
+      await fetchUserEventsFromFirebase();
     } catch (e) {
       print('Error al eliminar evento: $e');
       throw e;
@@ -371,14 +386,18 @@ class EventProvider with ChangeNotifier {
     }
   }
 
-  // Método para obtener todos los eventos de todos los usuarios (solo para admin)
-  Future<void> fetchAllEventsForAdmin() async {
-    try {
-      final events = await _firebaseServices.getAllAdminEvents();
-      _events = events;
-      notifyListeners();
-    } catch (e) {
-      print("Error al obtener los eventos para el administrador: $e");
+// Método para obtener todos los eventos de todos los usuarios (solo para admin)
+  Future<List<Map<String, dynamic>>> fetchAllEventsForAdmin() async {
+    // Asegúrate de que el usuario tiene el rol de administrador
+    var currentUser = FirebaseAuth.instance.currentUser;
+    var doc = await _firestore.collection('users').doc(currentUser?.uid).get();
+    if (doc.exists && doc.data()?['isAdmin'] == true) {
+      // El administrador puede obtener todos los eventos
+      var querySnapshot = await _firestore.collection('events').get();
+      return querySnapshot.docs.map((e) => e.data()).toList();
+    } else {
+      // No tiene permisos, puedes lanzar un error o devolver una lista vacía
+      return [];
     }
   }
 }

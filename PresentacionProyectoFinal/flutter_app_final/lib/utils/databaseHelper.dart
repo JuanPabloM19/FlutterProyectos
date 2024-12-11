@@ -23,22 +23,24 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'app_database6.db');
+    String path = join(await getDatabasesPath(), 'app_database9.db');
     return await openDatabase(
       path,
-      version: 6,
+      version: 9,
       onCreate: _onCreate,
     );
   }
 
   Future _onCreate(Database db, int version) async {
-    await db.execute('''CREATE TABLE users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        email TEXT,
-        password TEXT,
-        isAdmin INTEGER DEFAULT 0
-    )''');
+    await db.execute('''
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY,
+      name TEXT,
+      email TEXT,
+      password TEXT,
+      isAdmin INTEGER DEFAULT 0
+    )
+  ''');
 
     await db.execute('''CREATE TABLE equipment (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,44 +113,54 @@ class DatabaseHelper {
   Future<void> syncDataToFirebase() async {
     final db = await database;
 
-    // Sincronizar los usuarios con Firebase
+    // Obtenemos todos los usuarios de SQLite
     List<Map<String, dynamic>> users = await db.query('users');
-    for (var user in users) {
-      await _firestore.collection('users').doc(user['id'].toString()).set(user);
 
-      // Sincronizar los eventos con Firebase bajo cada usuario
-      List<Map<String, dynamic>> events = await db
-          .query('events', where: 'userId = ?', whereArgs: [user['id']]);
-      for (var event in events) {
-        if (event['id'] != null &&
-            event['equipmentId'] != null &&
-            event['userId'] != null) {
-          // Subir a la subcolección bajo el usuario
+    for (var user in users) {
+      String email = user['email'];
+
+      // Consulta para encontrar el UID correspondiente en Firebase
+      var querySnapshot = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        String uid = querySnapshot.docs.first.id;
+
+        // Sincroniza el usuario en Firebase
+        await _firestore.collection('users').doc(uid).set({
+          'name': user['name'],
+          'email': user['email'],
+          'password': user['password'],
+          'isAdmin': user['isAdmin'],
+        });
+
+        // Sincronizar los eventos para cada usuario
+        List<Map<String, dynamic>> events = await db
+            .query('events', where: 'userId = ?', whereArgs: [user['id']]);
+
+        for (var event in events) {
+          // Asegúrate de que el evento se sincronice en la subcolección 'events' del usuario
           await _firestore
               .collection('users')
-              .doc(user['id'].toString())
+              .doc(uid)
               .collection('events')
               .doc(event['id'].toString())
               .set(event);
 
-          // Subir también a la colección general "events"
+          // También sincronizar en la colección principal de eventos
           await _firestore
               .collection('events')
               .doc(event['id'].toString())
-              .set(event);
-        } else {
-          print('Error: Event contains null values: $event');
+              .set({
+            ...event,
+            'userId': uid // Relacionar con el UID correcto
+          });
         }
+      } else {
+        print('No se encontró UID para el usuario con email: ${user['email']}');
       }
-    }
-
-    // Sincronizar equipos con Firebase
-    List<Map<String, dynamic>> equipment = await db.query('equipment');
-    for (var equip in equipment) {
-      await _firestore
-          .collection('equipment')
-          .doc(equip['id'].toString())
-          .set(equip);
     }
   }
 

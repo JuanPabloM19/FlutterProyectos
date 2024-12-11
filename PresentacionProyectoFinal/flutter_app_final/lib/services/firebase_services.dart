@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/event_model.dart';
 import 'package:flutter_app_final/utils/databaseHelper.dart';
@@ -322,6 +323,10 @@ class FirebaseServices {
 
   /// Obtener todos los eventos de un usuario normal
   Future<List<Event>> getAllEvents(String userId) async {
+    if (userId.isEmpty || userId == '0') {
+      print("Error: El UID no está definido correctamente");
+      userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    }
     try {
       print("Buscando eventos para UID: $userId");
       QuerySnapshot snapshot = await _firestore
@@ -456,36 +461,64 @@ class FirebaseServices {
       // Obtener todos los usuarios
       QuerySnapshot usersSnapshot = await _firestore.collection('users').get();
 
-      for (var userDoc in usersSnapshot.docs) {
+      // Recolectar todos los futuros de los eventos para cada usuario
+      List<Future<List<Event>>> eventFutures =
+          usersSnapshot.docs.map((userDoc) async {
         var eventsRef = userDoc.reference.collection('events');
         QuerySnapshot eventsSnapshot = await eventsRef.get();
 
-        if (eventsSnapshot.docs.isEmpty) {
-          print("El usuario ${userDoc.id} no tiene eventos.");
-          continue;
-        }
+        return eventsSnapshot.docs.map((eventDoc) {
+          return Event.fromFirestore(eventDoc);
+        }).toList();
+      }).toList();
 
-        for (var eventDoc in eventsSnapshot.docs) {
-          Event event = Event.fromFirestore(eventDoc); // Usar fromFirestore
-          allEvents.add(event);
-        }
-      }
+      // Esperar a que todas las llamadas asíncronas terminen
+      List<List<Event>> allUsersEvents = await Future.wait(eventFutures);
+
+      // Aplanar la lista de listas en una lista plana
+      allEvents = allUsersEvents.expand((events) => events).toList();
     } catch (e) {
       print("Error al obtener eventos para administrador: $e");
     }
     return allEvents;
   }
 
-// Obtener todos los eventos para el administrador
+  Future<bool> checkIfUserIsAdmin(String userId) async {
+    try {
+      final idTokenResult =
+          await FirebaseAuth.instance.currentUser!.getIdTokenResult(true);
+      final claims = idTokenResult.claims;
+      final isAdmin = claims?['admin'] == true; // Verificar el claim 'admin'
+      print("El usuario con UID: $userId es Admin? $isAdmin");
+      return isAdmin; // ✅ Devolver el valor de isAdmin
+    } catch (e) {
+      print("Error al verificar si el usuario es admin: $e");
+      return false; // ⚠️ En caso de error, asumimos que no es admin
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getAllEventsForAdmin() async {
     try {
-      QuerySnapshot querySnapshot = await _firestore.collection('events').get();
-      List<Map<String, dynamic>> eventsList = querySnapshot.docs
-          .map((doc) => doc.data() as Map<String, dynamic>)
-          .toList();
-      return eventsList;
+      final usersCollection =
+          await FirebaseFirestore.instance.collection('users').get();
+      List<Map<String, dynamic>> allEvents = [];
+
+      for (var userDoc in usersCollection.docs) {
+        final userId = userDoc.id;
+        final eventsCollection = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('events')
+            .get();
+
+        for (var eventDoc in eventsCollection.docs) {
+          allEvents.add(eventDoc.data());
+        }
+      }
+      print(' Todos los eventos obtenidos: ${allEvents.length}');
+      return allEvents;
     } catch (e) {
-      print("Error al obtener todos los eventos: $e");
+      print(' Error obteniendo los eventos de admin: $e');
       return [];
     }
   }
