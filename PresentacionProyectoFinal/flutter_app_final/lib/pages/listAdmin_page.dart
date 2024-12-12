@@ -45,27 +45,39 @@ class _RentalListPageState extends State<RentalListPage> {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final isAdmin = await userProvider.checkIfUserIsAdmin();
 
-      print('Usuario actual: ${user.uid}, es admin: $isAdmin');
-
       final firebaseServices = FirebaseServices();
       final List<Map<String, dynamic>> allEvents = isAdmin
           ? await firebaseServices.getAllEventsForAdmin()
           : await firebaseServices.getUserEvents(user.uid);
 
-      print('Eventos obtenidos: ${allEvents.length}');
+      // Obtener la fecha de inicio de la semana (lunes)
+      DateTime now = DateTime.now();
+      DateTime startOfWeek =
+          now.subtract(Duration(days: now.weekday - 1)); // Lunes de esta semana
+      DateTime endOfWeek =
+          startOfWeek.add(Duration(days: 6)); // Domingo de esta semana
 
       final Map<DateTime, List<Event>> eventsByDay = {};
+
       for (var event in allEvents) {
         try {
           final eventDate = DateTime.parse(event['date']).toLocal();
+          // Filtrar eventos solo para la semana actual (de lunes a domingo)
+          if (eventDate.isBefore(startOfWeek) || eventDate.isAfter(endOfWeek)) {
+            continue;
+          }
           final dayKey =
-              DateTime(eventDate.year, eventDate.month, eventDate.day).toUtc();
-
+              DateTime(eventDate.year, eventDate.month, eventDate.day);
           eventsByDay.putIfAbsent(dayKey, () => []).add(Event.fromJson(event));
         } catch (e) {
           print('Error al convertir la fecha del evento: $e');
         }
       }
+
+// 🔥 ORDENAR LOS EVENTOS
+      eventsByDay.forEach((key, events) {
+        events.sort((a, b) => a.date.compareTo(b.date));
+      });
 
       setState(() {
         _eventsByDay = eventsByDay;

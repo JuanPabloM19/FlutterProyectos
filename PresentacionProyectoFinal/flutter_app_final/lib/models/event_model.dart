@@ -53,13 +53,16 @@ class Event {
   }
 
   factory Event.fromJson(Map<String, dynamic> json) {
+    DateTime parsedDate = DateTime.parse(json['date']).toLocal();
+
     return Event(
       id: json['id'] ?? '',
       title: json['title'] ?? '',
-      date: DateTime.parse(json['date']).toLocal(), // ⚠️ Usa .toLocal()
-      startTime: TimeOfDay.fromDateTime(DateTime.parse(json['startTime'])),
-      endTime: TimeOfDay.fromDateTime(DateTime.parse(json['endTime'])),
-      color: Color(int.parse(json['color'] ?? '0xFF000000')),
+      date: parsedDate,
+      startTime: Event.parseTime(json['startTime']),
+      endTime: Event.parseTime(json['endTime']),
+      color: Color(int.tryParse(json['color']?.toString() ?? '0xFF000000') ??
+          0xFF000000),
       userId: json['userId'] ?? '',
       equipment: json['equipment'] ?? '',
       data: json['data'] ?? '',
@@ -83,14 +86,15 @@ class Event {
   factory Event.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
 
-    DateTime eventDate = Event.dateFromFirebase(data['date']);
+    DateTime eventDate =
+        Event.dateFromFirebase(data['date']); // Esto está correcto
     final startTime = Event.parseTime(data['startTime']);
     final endTime = Event.parseTime(data['endTime']);
     int colorValue =
         int.tryParse(data['color']?.toString() ?? '0xFF000000') ?? 0xFF000000;
 
     return Event(
-      id: doc.id,
+      id: data['id'] ?? doc.id, // Usa el id del documento si no tiene id
       title: data['title'] ?? '',
       date: eventDate,
       startTime: startTime,
