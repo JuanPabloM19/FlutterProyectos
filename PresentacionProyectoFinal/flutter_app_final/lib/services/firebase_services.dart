@@ -531,9 +531,30 @@ class FirebaseServices {
           .toList();
 
       print('Total de eventos convertidos: ${allEvents.length}');
+
+      // **FILTRO DE LA SEMANA ACTUAL**
+      List<DateTime> weekDates = getWeekDates();
+      DateTime startDate = weekDates.first;
+      DateTime endDate = weekDates.last;
+
+      allEvents = allEvents.where((event) {
+        final eventDate =
+            DateTime(event.date.year, event.date.month, event.date.day);
+        return eventDate.isAfter(startDate.subtract(Duration(days: 1))) &&
+            eventDate.isBefore(endDate.add(Duration(days: 1)));
+      }).toList();
+
+      print('Total de eventos de la semana actual: ${allEvents.length}');
     } catch (e) {
       print('Error al obtener todos los eventos: $e');
     }
     return allEvents;
+  }
+
+  List<DateTime> getWeekDates() {
+    DateTime today = DateTime.now();
+    int currentDayOfWeek = today.weekday; // 1 (lunes) a 7 (domingo)
+    DateTime startOfWeek = today.subtract(Duration(days: currentDayOfWeek - 1));
+    return List.generate(7, (index) => startOfWeek.add(Duration(days: index)));
   }
 }

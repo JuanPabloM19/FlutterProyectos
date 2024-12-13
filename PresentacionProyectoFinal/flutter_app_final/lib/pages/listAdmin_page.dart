@@ -25,73 +25,41 @@ class _RentalListPageState extends State<RentalListPage> {
   }
 
   Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-      _eventsByDay.clear();
-    });
-
     try {
-      final user = FirebaseAuth.instance.currentUser;
-
-      if (user == null) {
-        setState(() {
-          _errorMessage = 'No se encontró el usuario autenticado.';
-          _isLoading = false;
-        });
-        return;
-      }
-
       final firebaseServices = FirebaseServices();
       final List<Event> allEvents =
           await firebaseServices.getAllEventsForAdmin();
 
-      print("Eventos totales recuperados: ${allEvents.length}");
-
-      if (allEvents.isEmpty) {
-        print("No se encontraron eventos.");
-      }
-
       DateTime now = DateTime.now();
-      DateTime startOfWeek =
-          now.subtract(Duration(days: now.weekday - 1)); // Lunes
-      DateTime endOfWeek = startOfWeek.add(Duration(days: 6)); // Domingo
+      DateTime startOfWeek = DateTime(now.year, now.month, now.day)
+          .subtract(Duration(days: now.weekday - 1));
+      DateTime endOfWeek = startOfWeek.add(Duration(days: 6));
 
-      // Inicializar los días de la semana en _eventsByDay
       _eventsByDay = {};
       for (int i = 0; i < 7; i++) {
         DateTime day = startOfWeek.add(Duration(days: i));
         _eventsByDay[DateTime(day.year, day.month, day.day)] = [];
       }
 
-      // Agrupar los eventos por día
-      final Map<DateTime, List<Event>> eventsByDay = {};
-
       for (var event in allEvents) {
         try {
           final eventDate =
-              DateTime.parse(event.date.toIso8601String()).toLocal();
+              DateTime(event.date.year, event.date.month, event.date.day);
           final dayKey =
               DateTime(eventDate.year, eventDate.month, eventDate.day);
 
-          // Verificación de eventos
-          print("Evento: ${event.title} para el ${eventDate}");
-
-          // Filtrar eventos solo para la semana actual
           if (dayKey.isBefore(startOfWeek) || dayKey.isAfter(endOfWeek)) {
             continue;
           }
 
-          eventsByDay.putIfAbsent(dayKey, () => []);
-          eventsByDay[dayKey]!.add(event);
+          _eventsByDay.putIfAbsent(dayKey, () => []);
+          _eventsByDay[dayKey]!.add(event);
         } catch (e) {
           print('Error al convertir la fecha del evento: $e');
         }
       }
 
-      // Agregar eventos por día
       setState(() {
-        _eventsByDay = eventsByDay;
         _isLoading = false;
       });
     } catch (e) {
