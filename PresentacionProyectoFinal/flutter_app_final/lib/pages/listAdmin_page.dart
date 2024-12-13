@@ -42,43 +42,54 @@ class _RentalListPageState extends State<RentalListPage> {
         return;
       }
 
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final isAdmin = await userProvider.checkIfUserIsAdmin();
-
       final firebaseServices = FirebaseServices();
-      final List<Map<String, dynamic>> allEvents = isAdmin
-          ? await firebaseServices.getAllEventsForAdmin()
-          : await firebaseServices.getUserEvents(user.uid);
+      final List<Event> allEvents =
+          await firebaseServices.getAllEventsForAdmin();
 
-      // Obtener la fecha de inicio de la semana (lunes)
+      print("Eventos totales recuperados: ${allEvents.length}");
+
+      if (allEvents.isEmpty) {
+        print("No se encontraron eventos.");
+      }
+
       DateTime now = DateTime.now();
       DateTime startOfWeek =
-          now.subtract(Duration(days: now.weekday - 1)); // Lunes de esta semana
-      DateTime endOfWeek =
-          startOfWeek.add(Duration(days: 6)); // Domingo de esta semana
+          now.subtract(Duration(days: now.weekday - 1)); // Lunes
+      DateTime endOfWeek = startOfWeek.add(Duration(days: 6)); // Domingo
 
+      // Inicializar los días de la semana en _eventsByDay
+      _eventsByDay = {};
+      for (int i = 0; i < 7; i++) {
+        DateTime day = startOfWeek.add(Duration(days: i));
+        _eventsByDay[DateTime(day.year, day.month, day.day)] = [];
+      }
+
+      // Agrupar los eventos por día
       final Map<DateTime, List<Event>> eventsByDay = {};
 
       for (var event in allEvents) {
         try {
-          final eventDate = DateTime.parse(event['date']).toLocal();
-          // Filtrar eventos solo para la semana actual (de lunes a domingo)
-          if (eventDate.isBefore(startOfWeek) || eventDate.isAfter(endOfWeek)) {
-            continue;
-          }
+          final eventDate =
+              DateTime.parse(event.date.toIso8601String()).toLocal();
           final dayKey =
               DateTime(eventDate.year, eventDate.month, eventDate.day);
-          eventsByDay.putIfAbsent(dayKey, () => []).add(Event.fromJson(event));
+
+          // Verificación de eventos
+          print("Evento: ${event.title} para el ${eventDate}");
+
+          // Filtrar eventos solo para la semana actual
+          if (dayKey.isBefore(startOfWeek) || dayKey.isAfter(endOfWeek)) {
+            continue;
+          }
+
+          eventsByDay.putIfAbsent(dayKey, () => []);
+          eventsByDay[dayKey]!.add(event);
         } catch (e) {
           print('Error al convertir la fecha del evento: $e');
         }
       }
 
-// 🔥 ORDENAR LOS EVENTOS
-      eventsByDay.forEach((key, events) {
-        events.sort((a, b) => a.date.compareTo(b.date));
-      });
-
+      // Agregar eventos por día
       setState(() {
         _eventsByDay = eventsByDay;
         _isLoading = false;
@@ -94,8 +105,6 @@ class _RentalListPageState extends State<RentalListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<UserProvider>(context);
-
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(title: const Text('Listado de Alquileres')),
@@ -130,6 +139,8 @@ class _RentalListPageState extends State<RentalListPage> {
                 dayDate.month == DateTime.now().month &&
                 dayDate.year == DateTime.now().year;
 
+            print("Eventos para el ${dayLabel}: ${eventsForDay.length}");
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -158,24 +169,19 @@ class _RentalListPageState extends State<RentalListPage> {
                   )
                 else
                   ...eventsForDay.map((event) {
-                    final userName =
-                        userProvider.getUserNameById(event.userId) ??
-                            'Usuario desconocido';
-
+                    final userName = event.userId ?? 'Usuario desconocido';
                     DateTime startDateTime = DateTime(
-                      DateTime.now().year,
-                      DateTime.now().month,
-                      DateTime.now().day,
-                      event.startTime.hour,
-                      event.startTime.minute,
-                    );
+                        DateTime.now().year,
+                        DateTime.now().month,
+                        DateTime.now().day,
+                        event.startTime.hour,
+                        event.startTime.minute);
                     DateTime endDateTime = DateTime(
-                      DateTime.now().year,
-                      DateTime.now().month,
-                      DateTime.now().day,
-                      event.endTime.hour,
-                      event.endTime.minute,
-                    );
+                        DateTime.now().year,
+                        DateTime.now().month,
+                        DateTime.now().day,
+                        event.endTime.hour,
+                        event.endTime.minute);
 
                     return ListTile(
                       title: Text('Usuario: $userName',
@@ -193,53 +199,6 @@ class _RentalListPageState extends State<RentalListPage> {
             );
           }).toList(),
         ),
-      ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            heroTag: 'addEvent',
-            onPressed: () {
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const CalendarPage()));
-            },
-            backgroundColor: const Color(0xFF80B3FF),
-            child: const Icon(Icons.add, color: Color(0xFF010618)),
-          ),
-          const SizedBox(height: 16),
-          FloatingActionButton(
-            heroTag: 'refreshEvents',
-            onPressed: () async {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Actualizando eventos...'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-
-              try {
-                await _loadData();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Eventos actualizados correctamente'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error al actualizar eventos: $e'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              }
-            },
-            backgroundColor: const Color(0xFF80B3FF),
-            child: const Icon(Icons.refresh, color: Color(0xFF010618)),
-          ),
-        ],
       ),
     );
   }

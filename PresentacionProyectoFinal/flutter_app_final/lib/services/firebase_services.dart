@@ -437,21 +437,33 @@ class FirebaseServices {
   }
 
   // Obtener los eventos de un usuario específico
-  Future<List<Map<String, dynamic>>> getUserEvents(String userId) async {
+  Future<List<Event>> getUserEvents(String userId) async {
+    List<Event> userEvents = [];
     try {
-      QuerySnapshot querySnapshot = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('events')
-          .get();
+      final eventsRef =
+          _firestore.collection('users').doc(userId).collection('events');
+      final eventsSnapshot = await eventsRef.get();
 
-      return querySnapshot.docs
-          .map((doc) => doc.data() as Map<String, dynamic>)
-          .toList();
+      if (eventsSnapshot.docs.isNotEmpty) {
+        userEvents = eventsSnapshot.docs
+            .map((eventDoc) {
+              try {
+                return Event.fromFirestore(eventDoc);
+              } catch (e) {
+                print('Error al convertir evento para el usuario $userId: $e');
+                return null; // Se puede ignorar el evento incorrecto
+              }
+            })
+            .whereType<Event>()
+            .toList(); // Ignora los nulos
+      }
+
+      print("Eventos cargados para el usuario $userId: ${userEvents.length}");
     } catch (e) {
-      print("Error al obtener los eventos: $e");
-      return [];
+      print("Error al obtener eventos del usuario $userId: $e");
     }
+
+    return userEvents;
   }
 
   // Obtener todos los eventos para el administrador
@@ -461,15 +473,16 @@ class FirebaseServices {
       // Obtener todos los usuarios
       QuerySnapshot usersSnapshot = await _firestore.collection('users').get();
 
-      // Recolectar todos los futuros de los eventos para cada usuario
+      // Recolectar todos los eventos para cada usuario
       List<Future<List<Event>>> eventFutures =
           usersSnapshot.docs.map((userDoc) async {
         var eventsRef = userDoc.reference.collection('events');
         QuerySnapshot eventsSnapshot = await eventsRef.get();
 
+        // Convertir los documentos a eventos de tipo Event
         return eventsSnapshot.docs.map((eventDoc) {
           return Event.fromFirestore(eventDoc);
-        }).toList();
+        }).toList(); // Devolver como lista de Event
       }).toList();
 
       // Esperar a que todas las llamadas asíncronas terminen
@@ -480,7 +493,7 @@ class FirebaseServices {
     } catch (e) {
       print("Error al obtener eventos para administrador: $e");
     }
-    return allEvents;
+    return allEvents; // Asegúrate de que la lista devuelta es de tipo List<Event>
   }
 
   Future<bool> checkIfUserIsAdmin(String userId) async {
@@ -490,36 +503,37 @@ class FirebaseServices {
       final claims = idTokenResult.claims;
       final isAdmin = claims?['admin'] == true; // Verificar el claim 'admin'
       print("El usuario con UID: $userId es Admin? $isAdmin");
-      return isAdmin; // ✅ Devolver el valor de isAdmin
+      return isAdmin;
     } catch (e) {
       print("Error al verificar si el usuario es admin: $e");
-      return false; // ⚠️ En caso de error, asumimos que no es admin
+      return false;
     }
   }
 
-  Future<List<Map<String, dynamic>>> getAllEventsForAdmin() async {
+  Future<List<Event>> getAllEventsForAdmin() async {
+    List<Event> allEvents = [];
     try {
-      final usersCollection =
-          await FirebaseFirestore.instance.collection('users').get();
-      List<Map<String, dynamic>> allEvents = [];
+      final querySnapshot = await _firestore.collectionGroup('events').get();
+      print(
+          'Total de documentos de eventos recuperados: ${querySnapshot.docs.length}');
 
-      for (var userDoc in usersCollection.docs) {
-        final userId = userDoc.id;
-        final eventsCollection = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .collection('events')
-            .get();
+      allEvents = querySnapshot.docs
+          .map((doc) {
+            try {
+              return Event.fromFirestore(doc);
+            } catch (e) {
+              print('Error al convertir evento: $e');
+              return null; // Retorna null si no se puede convertir
+            }
+          })
+          .where((event) => event != null)
+          .cast<Event>()
+          .toList();
 
-        for (var eventDoc in eventsCollection.docs) {
-          allEvents.add(eventDoc.data());
-        }
-      }
-      print(' Todos los eventos obtenidos: ${allEvents.length}');
-      return allEvents;
+      print('Total de eventos convertidos: ${allEvents.length}');
     } catch (e) {
-      print(' Error obteniendo los eventos de admin: $e');
-      return [];
+      print('Error al obtener todos los eventos: $e');
     }
+    return allEvents;
   }
 }

@@ -53,7 +53,14 @@ class Event {
   }
 
   factory Event.fromJson(Map<String, dynamic> json) {
-    DateTime parsedDate = DateTime.parse(json['date']).toLocal();
+    DateTime parsedDate;
+    try {
+      parsedDate = DateTime.parse(json['date']).toLocal();
+    } catch (e) {
+      print('Error al convertir la fecha: $e');
+      parsedDate =
+          DateTime.now(); // Usa una fecha por defecto para no romper la app
+    }
 
     return Event(
       id: json['id'] ?? '',
