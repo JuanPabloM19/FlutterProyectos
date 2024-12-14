@@ -23,10 +23,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> loadData() async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final eventProvider = Provider.of<EventProvider>(context, listen: false);
-
-    //await userProvider.loadAllUsers();
-    await eventProvider.fetchEvents(); // Asegurarse de cargar los eventos
+    await userProvider.loadUserData(); // Llama a la carga de datos del usuario
   }
 
   @override
@@ -152,8 +149,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: eventsToday.map((event) {
-                                          final userName = userProvider
-                                              .getUserNameById(event.userId);
+                                          final userName = userProvider.name;
 
                                           return Padding(
                                             padding: const EdgeInsets.symmetric(

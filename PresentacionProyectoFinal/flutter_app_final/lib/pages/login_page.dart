@@ -138,8 +138,7 @@ class _InputPageState extends State<LoginPage> {
       String userId = userCredential.user!.uid;
 
       // Usar una vez que FirebaseAuth ya tenga al usuario autenticado
-      Provider.of<UserProvider>(context, listen: false)
-          .loadUserData(_email, _password, context);
+      Provider.of<UserProvider>(context, listen: false).loadUserData();
 
       Provider.of<EventProvider>(context, listen: false).setUserId(userId);
       print("UID asignado en Provider: $userId");

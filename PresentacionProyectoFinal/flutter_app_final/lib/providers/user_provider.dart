@@ -1,9 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_app_final/pages/listAdmin_page.dart';
-import 'package:flutter_app_final/utils/navigation_bar.dart';
-import '../services/firebase_services.dart';
 
 class UserProvider with ChangeNotifier {
   String _name = 'Nombre Desconocido';
@@ -12,7 +9,12 @@ class UserProvider with ChangeNotifier {
   bool _isAdmin = false;
 
   final Map<String, User> _users = {};
-  final FirebaseServices _firebaseServices = FirebaseServices();
+
+  // Getters de los datos del usuario actual
+  String get name => _name;
+  String get email => _email;
+  String get userId => _userId;
+  bool get isAdmin => _isAdmin;
 
   /// Método para verificar si el usuario actual es administrador
   Future<bool> checkIfUserIsAdmin() async {
@@ -46,39 +48,96 @@ class UserProvider with ChangeNotifier {
   }
 
   /// Método para cargar los datos de un usuario específico desde Firebase
-  Future<void> loadUserData(
-      String email, String password, BuildContext context) async {
+  Future<void> loadUserData() async {
     try {
-      final user =
-          await _firebaseServices.getUserByEmailAndPassword(email, password);
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        _userId = currentUser.uid;
 
-      if (user != null) {
-        _name = user['name'];
-        _email = user['email'];
-        _userId = user['userId'].toString();
-        _isAdmin = user['isAdmin'] == 1;
-        print('Admin status: $_isAdmin');
+        // Obtener el nombre desde la subcolección 'name'
+        final nameSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(_userId)
+            .collection('name')
+            .limit(1)
+            .get();
 
-        // Redireccionar basado en el estado de admin
-        if (context.mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MainPage(isAdmin: _isAdmin),
-            ),
-          );
+        if (nameSnapshot.docs.isNotEmpty) {
+          _name =
+              nameSnapshot.docs.first.data()['name'] ?? 'Nombre Desconocido';
         }
+
+        // Obtener el correo desde la subcolección 'email'
+        final emailSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(_userId)
+            .collection('email')
+            .limit(1)
+            .get();
+
+        if (emailSnapshot.docs.isNotEmpty) {
+          _email =
+              emailSnapshot.docs.first.data()['email'] ?? 'Correo Desconocido';
+        }
+
+        print('Usuario cargado: Nombre=$_name, Correo=$_email, UID=$_userId');
       } else {
         resetUserData();
       }
+
       notifyListeners();
     } catch (e) {
       print("Error al cargar datos del usuario: $e");
     }
   }
 
-  /// Método para obtener el estado de administrador
-  bool get isAdmin => _isAdmin;
+  /// Método para cargar los nombres de usuarios desde Firestore
+  Future<void> loadUserNames() async {
+    try {
+      final usersCollection =
+          await FirebaseFirestore.instance.collection('users').get();
+      _users.clear();
+
+      for (var userDoc in usersCollection.docs) {
+        final userId = userDoc.id;
+
+        // Obtener nombre desde la subcolección 'name'
+        final nameSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('name')
+            .limit(1)
+            .get();
+
+        final userName = nameSnapshot.docs.isNotEmpty
+            ? nameSnapshot.docs.first.data()['name']
+            : 'Usuario desconocido';
+
+        // Obtener correo desde la subcolección 'email'
+        final emailSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('email')
+            .limit(1)
+            .get();
+
+        final userEmail = emailSnapshot.docs.isNotEmpty
+            ? emailSnapshot.docs.first.data()['email']
+            : 'Correo desconocido';
+
+        _users[userId] = User(
+          userId: userId,
+          name: userName,
+          email: userEmail,
+          isAdmin: userDoc.data()?['isAdmin'] == true,
+        );
+      }
+
+      notifyListeners();
+    } catch (e) {
+      print("Error al cargar los nombres de usuario: $e");
+    }
+  }
 
   /// Método para verificar si hay un usuario logueado
   bool isLoggedIn() {
@@ -98,33 +157,6 @@ class UserProvider with ChangeNotifier {
     _userId = '0';
     _isAdmin = false;
   }
-
-  /// Método para cargar los nombres de usuarios desde Firebase
-  Future<void> loadUserNames() async {
-    try {
-      final List<Map<String, dynamic>> userData =
-          await _firebaseServices.getAllUsers();
-      _users.clear();
-      for (var user in userData) {
-        _users[user['userId'].toString()] = User(
-          userId: user['userId'].toString(),
-          name: user['name'],
-          email: user['email'],
-          isAdmin: user['isAdmin'] == 1,
-        );
-      }
-      notifyListeners();
-    } catch (e) {
-      print("Error al cargar los nombres de usuario: $e");
-    }
-  }
-
-  /// Verifica si el usuario actual es administrador
-
-  // Getters de los datos del usuario actual
-  String get name => _name;
-  String get email => _email;
-  String get userId => _userId;
 }
 
 class User {

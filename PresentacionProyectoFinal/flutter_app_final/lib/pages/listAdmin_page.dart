@@ -119,107 +119,130 @@ class _RentalListPageState extends State<RentalListPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Center(child: Text('Listado de Alquileres')),
-        backgroundColor: const Color(0xFF010618),
-        foregroundColor: Colors.white,
-      ),
-      body: Container(
-        color: const Color(0xFF010618),
-        child: ListView(
-          children: _eventsByDay.entries.map((entry) {
-            DateTime dayDate = entry.key;
-            List<Event> eventsForDay = entry.value ?? [];
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: const Center(child: Text('Listado de Alquileres')),
+          backgroundColor: const Color(0xFF010618),
+          foregroundColor: Colors.white,
+        ),
+        body: Container(
+          color: const Color(0xFF010618),
+          child: ListView(
+            children: _eventsByDay.entries.map((entry) {
+              DateTime dayDate = entry.key;
+              List<Event> eventsForDay = entry.value ?? [];
 
-            final dayLabel =
-                "${DateFormat('EEEE', 'es').format(dayDate)} ${dayDate.day}";
-            final isToday = dayDate.day == DateTime.now().day &&
-                dayDate.month == DateTime.now().month &&
-                dayDate.year == DateTime.now().year;
+              final dayLabel =
+                  "${DateFormat('EEEE', 'es').format(dayDate)} ${dayDate.day}";
+              final isToday = dayDate.day == DateTime.now().day &&
+                  dayDate.month == DateTime.now().month &&
+                  dayDate.year == DateTime.now().year;
 
-            print("Eventos para el ${dayLabel}: ${eventsForDay.length}");
+              print("Eventos para el ${dayLabel}: ${eventsForDay.length}");
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Text(
-                    dayLabel.toUpperCase(),
-                    style: TextStyle(
-                      color: isToday ? Colors.green : Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const Divider(color: Colors.white),
-                if (eventsForDay.isEmpty)
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text(
-                        'No hay alquileres para este día.',
-                        style: TextStyle(color: Colors.white70),
+                    child: Text(
+                      dayLabel.toUpperCase(),
+                      style: TextStyle(
+                        color: isToday ? Colors.green : Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  )
-                else
-                  ...eventsForDay.map((event) {
-                    return FutureBuilder<Map<String, dynamic>>(
-                      future: getUserDetails(event.userId),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return ListTile(
-                            title: Text('Cargando usuario...'),
-                            subtitle: Text('Equipo: ${event.equipment}'),
-                          );
-                        }
+                  ),
+                  const Divider(color: Colors.white),
+                  if (eventsForDay.isEmpty)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                          'No hay alquileres para este día.',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ),
+                    )
+                  else
+                    ...eventsForDay.map((event) {
+                      return FutureBuilder<Map<String, dynamic>>(
+                        future: getUserDetails(event.userId),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return ListTile(
+                              title: Text('Cargando usuario...'),
+                              subtitle: Text('Equipo: ${event.equipment}'),
+                            );
+                          }
 
-                        DateTime startDateTime = DateTime(
-                            DateTime.now().year,
-                            DateTime.now().month,
-                            DateTime.now().day,
-                            event.startTime.hour,
-                            event.startTime.minute);
-                        DateTime endDateTime = DateTime(
-                            DateTime.now().year,
-                            DateTime.now().month,
-                            DateTime.now().day,
-                            event.endTime.hour,
-                            event.endTime.minute);
+                          DateTime startDateTime = DateTime(
+                              DateTime.now().year,
+                              DateTime.now().month,
+                              DateTime.now().day,
+                              event.startTime.hour,
+                              event.startTime.minute);
+                          DateTime endDateTime = DateTime(
+                              DateTime.now().year,
+                              DateTime.now().month,
+                              DateTime.now().day,
+                              event.endTime.hour,
+                              event.endTime.minute);
 
-                        if (snapshot.hasData) {
-                          final user = snapshot.data!;
-                          return ListTile(
-                            title: Text('Usuario: ${user['name']}',
-                                style: const TextStyle(color: Colors.white)),
-                            subtitle: Text(
-                              'Email: ${user['email']}\nEquipo: ${event.equipment}\nHorario: ${DateFormat('HH:mm').format(startDateTime)} a ${DateFormat('HH:mm').format(endDateTime)}',
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                            tileColor: Colors.green.withOpacity(0.1),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8.0)),
-                          );
-                        } else {
-                          return ListTile(
-                            title: Text('Usuario desconocido'),
-                            subtitle: Text(
-                                'Equipo: ${event.equipment}\nHorario: ${DateFormat('HH:mm').format(startDateTime)} a ${DateFormat('HH:mm').format(endDateTime)}'),
-                          );
-                        }
-                      },
-                    );
-                  }).toList(),
-              ],
-            );
-          }).toList(),
+                          if (snapshot.hasData) {
+                            final user = snapshot.data!;
+                            return ListTile(
+                              title: Text('Usuario: ${user['name']}',
+                                  style: const TextStyle(color: Colors.white)),
+                              subtitle: Text(
+                                'Email: ${user['email']}\nEquipo: ${event.equipment}\nHorario: ${DateFormat('HH:mm').format(startDateTime)} a ${DateFormat('HH:mm').format(endDateTime)}',
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                              tileColor: Colors.green.withOpacity(0.1),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8.0)),
+                            );
+                          } else {
+                            return ListTile(
+                              title: Text('Usuario desconocido'),
+                              subtitle: Text(
+                                  'Equipo: ${event.equipment}\nHorario: ${DateFormat('HH:mm').format(startDateTime)} a ${DateFormat('HH:mm').format(endDateTime)}'),
+                            );
+                          }
+                        },
+                      );
+                    }).toList(),
+                ],
+              );
+            }).toList(),
+          ),
         ),
-      ),
-    );
+        floatingActionButton: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            FloatingActionButton(
+              onPressed: () {
+                // Navegar a TodayPage
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CalendarPage()),
+                );
+              },
+              backgroundColor: Color(0xFF80B3FF),
+              child: Icon(Icons.add, color: Color(0xFF010618)),
+            ),
+            SizedBox(height: 16),
+            FloatingActionButton(
+              onPressed: () {
+                _loadData();
+              },
+              backgroundColor: Color(0xFF80B3FF),
+              child: Icon(Icons.refresh, color: Color(0xFF010618)),
+            ),
+          ],
+        ));
   }
 }

@@ -47,8 +47,7 @@ class MyApp extends StatelessWidget {
             ChangeNotifierProvider(
                 create: (context) => EventProvider()..setUserId(uid ?? '')),
             ChangeNotifierProvider(
-                create: (context) => UserProvider()
-                  ..loadUserData(user?.email ?? '', '', context)),
+                create: (context) => UserProvider()..loadUserData()),
             ChangeNotifierProvider(create: (context) => EquipmentProvider()),
           ],
           child: FutureBuilder<SharedPreferences>(
