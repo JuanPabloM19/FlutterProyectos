@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/event_model.dart';
@@ -24,6 +25,41 @@ class _RentalListPageState extends State<RentalListPage> {
     _loadData(); // Cargar datos al iniciar
   }
 
+  Future<Map<String, dynamic>> getUserDetails(String userId) async {
+    try {
+      // Obtener el documento 'name' desde la subcolección 'name'
+      QuerySnapshot nameSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('name')
+          .limit(1)
+          .get();
+
+      // Obtener el documento 'email' desde la subcolección 'email'
+      QuerySnapshot emailSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('email')
+          .limit(1)
+          .get();
+
+      // Verificar si se obtuvo un documento en cada subcolección
+      DocumentSnapshot? nameDoc =
+          nameSnapshot.docs.isNotEmpty ? nameSnapshot.docs.first : null;
+
+      DocumentSnapshot? emailDoc =
+          emailSnapshot.docs.isNotEmpty ? emailSnapshot.docs.first : null;
+
+      return {
+        'name': nameDoc != null ? nameDoc['name'] : 'Usuario desconocido',
+        'email': emailDoc != null ? emailDoc['email'] : 'Email desconocido',
+      };
+    } catch (e) {
+      print('Error obteniendo los detalles del usuario: $e');
+      return {'name': 'Usuario desconocido', 'email': 'Email desconocido'};
+    }
+  }
+
   Future<void> _loadData() async {
     try {
       final firebaseServices = FirebaseServices();
@@ -42,21 +78,16 @@ class _RentalListPageState extends State<RentalListPage> {
       }
 
       for (var event in allEvents) {
-        try {
-          final eventDate =
-              DateTime(event.date.year, event.date.month, event.date.day);
-          final dayKey =
-              DateTime(eventDate.year, eventDate.month, eventDate.day);
+        final eventDate =
+            DateTime(event.date.year, event.date.month, event.date.day);
+        final dayKey = DateTime(eventDate.year, eventDate.month, eventDate.day);
 
-          if (dayKey.isBefore(startOfWeek) || dayKey.isAfter(endOfWeek)) {
-            continue;
-          }
-
-          _eventsByDay.putIfAbsent(dayKey, () => []);
-          _eventsByDay[dayKey]!.add(event);
-        } catch (e) {
-          print('Error al convertir la fecha del evento: $e');
+        if (dayKey.isBefore(startOfWeek) || dayKey.isAfter(endOfWeek)) {
+          continue;
         }
+
+        _eventsByDay.putIfAbsent(dayKey, () => []);
+        _eventsByDay[dayKey]!.add(event);
       }
 
       setState(() {
@@ -137,30 +168,51 @@ class _RentalListPageState extends State<RentalListPage> {
                   )
                 else
                   ...eventsForDay.map((event) {
-                    final userName = event.userId ?? 'Usuario desconocido';
-                    DateTime startDateTime = DateTime(
-                        DateTime.now().year,
-                        DateTime.now().month,
-                        DateTime.now().day,
-                        event.startTime.hour,
-                        event.startTime.minute);
-                    DateTime endDateTime = DateTime(
-                        DateTime.now().year,
-                        DateTime.now().month,
-                        DateTime.now().day,
-                        event.endTime.hour,
-                        event.endTime.minute);
+                    return FutureBuilder<Map<String, dynamic>>(
+                      future: getUserDetails(event.userId),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return ListTile(
+                            title: Text('Cargando usuario...'),
+                            subtitle: Text('Equipo: ${event.equipment}'),
+                          );
+                        }
 
-                    return ListTile(
-                      title: Text('Usuario: $userName',
-                          style: const TextStyle(color: Colors.white)),
-                      subtitle: Text(
-                        'Equipo: ${event.equipment}\nHorario: ${DateFormat('HH:mm').format(startDateTime)} a ${DateFormat('HH:mm').format(endDateTime)}',
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                      tileColor: Colors.green.withOpacity(0.1),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.0)),
+                        DateTime startDateTime = DateTime(
+                            DateTime.now().year,
+                            DateTime.now().month,
+                            DateTime.now().day,
+                            event.startTime.hour,
+                            event.startTime.minute);
+                        DateTime endDateTime = DateTime(
+                            DateTime.now().year,
+                            DateTime.now().month,
+                            DateTime.now().day,
+                            event.endTime.hour,
+                            event.endTime.minute);
+
+                        if (snapshot.hasData) {
+                          final user = snapshot.data!;
+                          return ListTile(
+                            title: Text('Usuario: ${user['name']}',
+                                style: const TextStyle(color: Colors.white)),
+                            subtitle: Text(
+                              'Email: ${user['email']}\nEquipo: ${event.equipment}\nHorario: ${DateFormat('HH:mm').format(startDateTime)} a ${DateFormat('HH:mm').format(endDateTime)}',
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            tileColor: Colors.green.withOpacity(0.1),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8.0)),
+                          );
+                        } else {
+                          return ListTile(
+                            title: Text('Usuario desconocido'),
+                            subtitle: Text(
+                                'Equipo: ${event.equipment}\nHorario: ${DateFormat('HH:mm').format(startDateTime)} a ${DateFormat('HH:mm').format(endDateTime)}'),
+                          );
+                        }
+                      },
                     );
                   }).toList(),
               ],
