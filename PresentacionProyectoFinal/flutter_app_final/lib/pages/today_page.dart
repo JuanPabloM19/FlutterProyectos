@@ -663,7 +663,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   textStyle: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 child: const Text('Agregar'),
-                onPressed: () {
+                onPressed: () async {
                   if (selectedEquipment == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -680,19 +680,38 @@ class _CalendarPageState extends State<CalendarPage> {
                     return;
                   }
 
-                  // Crear un ID único para el evento
+                  // Verifica si el equipo está disponible
+                  // Verifica si el equipo está disponible
+                  // Verifica si el equipo está disponible
+                  bool isAvailable =
+                      await equipmentProvider.checkEquipmentAvailability(
+                    selectedEquipment!.id
+                        .toString(), // Convierte el id a String
+                    (_selectedDay ?? _focusedDay).toIso8601String(),
+                  );
+
+                  if (!isAvailable) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              'El equipo ya está reservado en esa fecha.')),
+                    );
+                    return;
+                  }
+
+                  // Si el equipo está disponible, crear un ID único para el evento y agregarlo
                   var uuid = Uuid();
-                  String eventId = uuid.v4(); // Genera un ID único
+                  String eventId = uuid.v4();
 
                   Event newEvent = Event(
-                    id: eventId, // Asignamos el ID generado
+                    id: eventId,
                     title: eventType,
                     equipment: selectedEquipment!.nameE,
                     startTime: startTime!,
                     endTime: endTime!,
                     date: _selectedDay ?? _focusedDay,
                     userId: userId,
-                    color: selectedColor, // Se pasa el color seleccionado aquí
+                    color: selectedColor,
                   );
                   eventProvider.addEvent(context, newEvent);
                   Navigator.pop(context);

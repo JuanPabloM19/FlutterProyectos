@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_app_final/providers/equipment_provider.dart';
 import 'package:flutter_app_final/providers/user_provider.dart';
 import 'package:flutter_app_final/services/firebase_services.dart';
 import 'package:path/path.dart';
@@ -200,6 +201,7 @@ class EventProvider with ChangeNotifier {
     }
   }
 
+  // Método para agregar un evento
   Future<void> addEvent(BuildContext context, Event event) async {
     try {
       if (event.id.isEmpty) {
@@ -219,21 +221,25 @@ class EventProvider with ChangeNotifier {
         return;
       }
 
-      final dateOnly =
-          DateTime(event.date.year, event.date.month, event.date.day);
+      // Reservar equipo y crear el evento en una única transacción
+      final equipmentProvider =
+          Provider.of<EquipmentProvider>(context, listen: false);
+      final success = await equipmentProvider.reserveEquipment(
+        event.equipment,
+        event.date.toIso8601String().split('T').first, // Solo la fecha
+        event.userId,
+        event.title,
+        event.startTime,
+        event.endTime,
+        event.color,
+        event.data ?? '',
+        context,
+      );
 
-      // Verificar disponibilidad del equipo
-      if (!isTeamAvailable(
-          event.equipment, dateOnly, event.startTime, event.endTime)) {
-        throw Exception(
-            'El equipo ya está reservado por otro usuario para esta fecha.');
+      if (!success) {
+        throw Exception('No se pudo reservar el equipo para esta fecha.');
       }
 
-      // Guardar el evento en Firestore
-      await _firebaseServices.saveUserEvents(event.userId, [event], context);
-
-      // Guardar localmente
-      _saveEventLocally(event.userId, event);
       notifyListeners();
       print("Evento agregado correctamente.");
     } catch (e) {
@@ -313,9 +319,10 @@ class EventProvider with ChangeNotifier {
   }
 
   // Verificar si el equipo está disponible para una fecha específica
+  // Verificar si el equipo está disponible para una fecha y hora específica
   bool isTeamAvailable(String equipmentName, DateTime selectedDate,
       TimeOfDay startTime, TimeOfDay endTime) {
-    // Convertir TimeOfDay a DateTime para hacer comparaciones
+    // Convertir los TimeOfDay a DateTime para comparación con los eventos
     DateTime startDateTime = DateTime(
       selectedDate.year,
       selectedDate.month,
@@ -337,7 +344,6 @@ class EventProvider with ChangeNotifier {
       if (userEvents[selectedDate] != null) {
         for (var event in userEvents[selectedDate]!) {
           if (event.equipment == equipmentName) {
-            // Convertir los tiempos de los eventos a DateTime para la comparación
             DateTime eventStartTime = DateTime(
               selectedDate.year,
               selectedDate.month,

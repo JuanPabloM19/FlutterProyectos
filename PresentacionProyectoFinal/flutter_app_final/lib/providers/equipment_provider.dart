@@ -1,13 +1,16 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_final/models/equipment_model.dart';
 import 'package:flutter_app_final/models/event_model.dart';
 import 'package:flutter_app_final/providers/event_provider.dart';
 import 'package:flutter_app_final/utils/databaseHelper.dart';
+import 'package:path/path.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 class EquipmentProvider with ChangeNotifier {
   List<Equipment> _equipmentList = [];
+  FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isLoading = false;
   String? _error;
 
@@ -34,56 +37,108 @@ class EquipmentProvider with ChangeNotifier {
   }
 
   Future<bool> reserveEquipment(
-    BuildContext context,
-    int equipmentId,
+    String equipmentId,
     String date,
     String userId,
     String title,
-    TimeOfDay? startTime,
-    TimeOfDay? endTime,
-    Color? color,
+    TimeOfDay startTime,
+    TimeOfDay endTime,
+    Color color,
+    String data,
+    BuildContext context,
   ) async {
-    final eventProvider = Provider.of<EventProvider>(context, listen: false);
-    final equipmentName = _equipmentList
-        .firstWhere((equipment) => equipment.id == equipmentId)
-        .nameE;
+    try {
+      await _firestore.runTransaction((transaction) async {
+        // Buscar equipo por el campo `nameE`
+        QuerySnapshot querySnapshot = await _firestore
+            .collection('equipment')
+            .where('nameE', isEqualTo: equipmentId) // Buscar por nombre
+            .limit(1)
+            .get();
 
-    DateTime parsedDate = DateTime.parse(date);
-    bool isAvailable = eventProvider.isTeamAvailable(
-        equipmentName, parsedDate, startTime!, endTime!);
+        if (querySnapshot.docs.isEmpty) {
+          throw Exception("Equipo no encontrado");
+        }
 
-    if (!isAvailable) {
-      print('El equipo no está disponible.');
-      return false; // Salir si no está disponible
-    }
+        DocumentReference equipmentRef = querySnapshot.docs.first.reference;
 
-    // Si el equipo está disponible, proceder con la reserva
-    final success = await DatabaseHelper()
-        .reserveEquipment(equipmentId, date, userId, startTime, endTime);
+        DocumentSnapshot equipmentSnapshot =
+            await transaction.get(equipmentRef);
+        Map<String, dynamic> equipmentData =
+            equipmentSnapshot.data() as Map<String, dynamic>;
+        List<String> reservedDates = (equipmentData['reservedDates'] is List)
+            ? List<String>.from(equipmentData['reservedDates'])
+            : [];
 
-    if (success) {
-      await fetchEquipments();
-      // Generar un ID único para el evento
-      var uuid = Uuid();
-      String eventId = uuid.v4(); // Generar un ID único
+        if (reservedDates.contains(date)) {
+          throw Exception("El equipo ya está reservado para esta fecha.");
+        }
 
-      eventProvider.addEvent(
-        context,
-        Event(
-          id: eventId, // Asignamos el ID generado
+        reservedDates.add(date);
+        transaction.update(equipmentRef, {
+          'reservedDates': FieldValue.arrayUnion([date])
+        });
+
+        String eventId = _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('events')
+            .doc()
+            .id;
+
+        Event newEvent = Event(
+          id: eventId,
           title: title,
-          date: parsedDate,
+          date: DateTime.parse(date),
           startTime: startTime,
           endTime: endTime,
-          color: color ?? Colors.blue,
+          color: color,
           userId: userId,
-          equipment: equipmentName,
-          data: '',
-        ),
-      );
-    }
+          equipment: equipmentId, // Deja el nombre aquí, no cambia
+          data: data,
+        );
 
-    return success;
+        DocumentReference eventRef = _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('events')
+            .doc(eventId);
+
+        transaction.set(eventRef, newEvent.toJson());
+      });
+
+      return true;
+    } catch (e) {
+      print("Error al reservar equipo: $e");
+      return false;
+    }
+  }
+
+  // Función para verificar la disponibilidad de un equipo en una fecha y hora específica
+  Future<bool> checkEquipmentAvailability(
+      String equipmentId, String date) async {
+    try {
+      DocumentSnapshot equipmentSnapshot =
+          await _firestore.collection('equipment').doc(equipmentId).get();
+
+      if (!equipmentSnapshot.exists) {
+        throw Exception("Equipo no encontrado");
+      }
+
+      Map<String, dynamic> equipmentData =
+          equipmentSnapshot.data() as Map<String, dynamic>;
+      var reservedDatesData = equipmentData['reservedDates'];
+      List<String> reservedDates = (reservedDatesData is List)
+          ? List<String>.from(reservedDatesData)
+          : [];
+
+      // Verificar si la fecha está reservada
+      return !reservedDates
+          .contains(date); // True si está disponible, False si está reservada
+    } catch (e) {
+      print("Error al verificar disponibilidad: $e");
+      return false;
+    }
   }
 
   // Método para liberar equipo
