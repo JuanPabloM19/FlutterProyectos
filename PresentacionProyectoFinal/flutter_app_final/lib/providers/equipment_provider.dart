@@ -46,13 +46,14 @@ class EquipmentProvider with ChangeNotifier {
     Color color,
     String data,
     BuildContext context,
+    String eventId, // Recibe el ID del evento
   ) async {
     try {
       await _firestore.runTransaction((transaction) async {
-        // Buscar equipo por el campo `nameE`
+        // Buscar equipo por nombre (nameE)
         QuerySnapshot querySnapshot = await _firestore
             .collection('equipment')
-            .where('nameE', isEqualTo: equipmentId) // Buscar por nombre
+            .where('nameE', isEqualTo: equipmentId)
             .limit(1)
             .get();
 
@@ -74,27 +75,26 @@ class EquipmentProvider with ChangeNotifier {
           throw Exception("El equipo ya está reservado para esta fecha.");
         }
 
+        // Actualizar lista de fechas reservadas
         reservedDates.add(date);
         transaction.update(equipmentRef, {
           'reservedDates': FieldValue.arrayUnion([date])
         });
 
-        String eventId = _firestore
-            .collection('users')
-            .doc(userId)
-            .collection('events')
-            .doc()
-            .id;
+        // Formatear la fecha correctamente
+        DateTime parsedDate = DateTime.parse(date);
+        String formattedDate = parsedDate.toIso8601String();
 
+        // Crear nuevo evento con el mismo ID generado al inicio
         Event newEvent = Event(
-          id: eventId,
+          id: eventId, // Usar el ID proporcionado, no generarlo de nuevo
           title: title,
-          date: DateTime.parse(date),
+          date: parsedDate,
           startTime: startTime,
           endTime: endTime,
           color: color,
           userId: userId,
-          equipment: equipmentId, // Deja el nombre aquí, no cambia
+          equipment: equipmentId,
           data: data,
         );
 
@@ -102,13 +102,19 @@ class EquipmentProvider with ChangeNotifier {
             .collection('users')
             .doc(userId)
             .collection('events')
-            .doc(eventId);
+            .doc(eventId); // Usar el ID aquí
 
         transaction.set(eventRef, newEvent.toJson());
       });
 
       return true;
     } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
       print("Error al reservar equipo: $e");
       return false;
     }

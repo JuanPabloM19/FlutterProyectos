@@ -681,20 +681,19 @@ class _CalendarPageState extends State<CalendarPage> {
                   }
 
                   // Verifica si el equipo está disponible
-                  // Verifica si el equipo está disponible
-                  // Verifica si el equipo está disponible
                   bool isAvailable =
                       await equipmentProvider.checkEquipmentAvailability(
-                    selectedEquipment!.id
-                        .toString(), // Convierte el id a String
-                    (_selectedDay ?? _focusedDay).toIso8601String(),
+                    selectedEquipment!.id.toString(),
+                    (_selectedDay ?? _focusedDay)
+                        .toIso8601String(), // Mantener formato ISO completo
                   );
 
                   if (!isAvailable) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                          content: Text(
-                              'El equipo ya está reservado en esa fecha.')),
+                        content:
+                            Text('El equipo ya está reservado en esa fecha.'),
+                      ),
                     );
                     return;
                   }

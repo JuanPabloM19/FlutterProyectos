@@ -9,6 +9,7 @@ import 'package:path/path.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:uuid/uuid.dart';
 import '../models/event_model.dart';
 
 class EventProvider with ChangeNotifier {
@@ -201,16 +202,13 @@ class EventProvider with ChangeNotifier {
     }
   }
 
-  // Método para agregar un evento
+  // Método para agregar un evento en EventProvider
   Future<void> addEvent(BuildContext context, Event event) async {
     try {
+      // Generar un ID único y asegurarse de que se use siempre el mismo
       if (event.id.isEmpty) {
-        event.id = _firestore
-            .collection('users')
-            .doc(event.userId)
-            .collection('events')
-            .doc()
-            .id;
+        var uuid = Uuid();
+        event.id = uuid.v4(); // Generar UUID en lugar de usar .doc().id
       }
 
       // Validar datos del evento
@@ -221,12 +219,12 @@ class EventProvider with ChangeNotifier {
         return;
       }
 
-      // Reservar equipo y crear el evento en una única transacción
+      // Llamar al EquipmentProvider y pasar el ID del evento
       final equipmentProvider =
           Provider.of<EquipmentProvider>(context, listen: false);
       final success = await equipmentProvider.reserveEquipment(
         event.equipment,
-        event.date.toIso8601String().split('T').first, // Solo la fecha
+        event.date.toIso8601String(), // Formato ISO con precisión
         event.userId,
         event.title,
         event.startTime,
@@ -234,6 +232,7 @@ class EventProvider with ChangeNotifier {
         event.color,
         event.data ?? '',
         context,
+        event.id, // Se pasa el ID aquí
       );
 
       if (!success) {
@@ -241,7 +240,7 @@ class EventProvider with ChangeNotifier {
       }
 
       notifyListeners();
-      print("Evento agregado correctamente.");
+      print("Evento agregado correctamente con ID: ${event.id}");
     } catch (e) {
       print("Error al agregar evento: $e");
     }
