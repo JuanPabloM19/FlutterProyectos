@@ -58,8 +58,7 @@ class Event {
       parsedDate = DateTime.parse(json['date']).toLocal();
     } catch (e) {
       print('Error al convertir la fecha: $e');
-      parsedDate =
-          DateTime.now(); // Usa una fecha por defecto para no romper la app
+      parsedDate = DateTime.now();
     }
 
     return Event(
@@ -93,15 +92,14 @@ class Event {
   factory Event.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
 
-    DateTime eventDate =
-        Event.dateFromFirebase(data['date']); // Esto está correcto
+    DateTime eventDate = Event.dateFromFirebase(data['date']);
     final startTime = Event.parseTime(data['startTime']);
     final endTime = Event.parseTime(data['endTime']);
     int colorValue =
         int.tryParse(data['color']?.toString() ?? '0xFF000000') ?? 0xFF000000;
 
     return Event(
-      id: data['id'] ?? doc.id, // Usa el id del documento si no tiene id
+      id: data['id'] ?? doc.id,
       title: data['title'] ?? '',
       date: eventDate,
       startTime: startTime,

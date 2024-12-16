@@ -42,7 +42,7 @@ class _EquipmentWidgetState extends State<EquipmentWidget> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16),
       child: DropdownButton<Equipment>(
-        value: _currentSelectedEquipment, // Usa el valor del estado local
+        value: _currentSelectedEquipment,
         isExpanded: true,
         items: widget.equipmentList.map((equipment) {
           bool isAvailable = eventProvider.isTeamAvailable(
@@ -73,10 +73,9 @@ class _EquipmentWidgetState extends State<EquipmentWidget> {
                 widget.endTime,
               )) {
             setState(() {
-              _currentSelectedEquipment =
-                  equipment; // Actualiza el estado local
+              _currentSelectedEquipment = equipment;
             });
-            widget.onChanged(equipment); // Notifica el cambio
+            widget.onChanged(equipment);
           }
         },
         icon: Icon(Icons.arrow_drop_down, color: Colors.black),

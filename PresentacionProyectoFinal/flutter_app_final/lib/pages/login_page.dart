@@ -137,19 +137,18 @@ class _InputPageState extends State<LoginPage> {
 
       String userId = userCredential.user!.uid;
 
-      // Usar una vez que FirebaseAuth ya tenga al usuario autenticado
       Provider.of<UserProvider>(context, listen: false).loadUserData();
 
       Provider.of<EventProvider>(context, listen: false).setUserId(userId);
       print("UID asignado en Provider: $userId");
 
-      // ✅ Verificar si el usuario es administrador y obtener el resultado
+      // Verificar si el usuario es administrador y obtener el resultado
       bool isAdmin = await FirebaseServices().checkIfUserIsAdmin(userId);
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('userId', userId);
-      await prefs.setBool('isAdmin', isAdmin); // Guardar si el usuario es admin
+      await prefs.setBool('isAdmin', isAdmin);
 
-      _showSuccessDialog(context, isAdmin); // Pasar "isAdmin" al dialogo
+      _showSuccessDialog(context, isAdmin);
     } on FirebaseAuthException catch (e) {
       _showErrorDialog(context, e.message ?? "Error desconocido");
     }
@@ -209,7 +208,7 @@ class _InputPageState extends State<LoginPage> {
           actions: [
             TextButton(
               child: const Text(
-                "Intente nuevamente",
+                "Intente nuevamente, datos erroneos",
                 style: TextStyle(color: Color(0xFF010618)),
               ),
               onPressed: () {

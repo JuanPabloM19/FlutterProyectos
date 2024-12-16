@@ -10,7 +10,6 @@ class UserProvider with ChangeNotifier {
 
   final Map<String, User> _users = {};
 
-  // Getters de los datos del usuario actual
   String get name => _name;
   String get email => _email;
   String get userId => _userId;
@@ -18,7 +17,7 @@ class UserProvider with ChangeNotifier {
 
   /// Método para verificar si el usuario actual es administrador
   Future<bool> checkIfUserIsAdmin() async {
-    if (_isAdmin) return _isAdmin; // Evitar múltiples solicitudes innecesarias
+    if (_isAdmin) return _isAdmin;
     try {
       var currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
@@ -54,7 +53,6 @@ class UserProvider with ChangeNotifier {
       if (currentUser != null) {
         _userId = currentUser.uid;
 
-        // Obtener el nombre desde la subcolección 'name'
         final nameSnapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(_userId)
@@ -67,7 +65,6 @@ class UserProvider with ChangeNotifier {
               nameSnapshot.docs.first.data()['name'] ?? 'Nombre Desconocido';
         }
 
-        // Obtener el correo desde la subcolección 'email'
         final emailSnapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(_userId)
@@ -100,8 +97,6 @@ class UserProvider with ChangeNotifier {
 
       for (var userDoc in usersCollection.docs) {
         final userId = userDoc.id;
-
-        // Obtener nombre desde la subcolección 'name'
         final nameSnapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(userId)
@@ -112,8 +107,6 @@ class UserProvider with ChangeNotifier {
         final userName = nameSnapshot.docs.isNotEmpty
             ? nameSnapshot.docs.first.data()['name']
             : 'Usuario desconocido';
-
-        // Obtener correo desde la subcolección 'email'
         final emailSnapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(userId)

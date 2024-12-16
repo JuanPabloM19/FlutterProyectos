@@ -12,18 +12,17 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late Future<void> _loadDataFuture;
-  final firebaseServices =
-      FirebaseServices(); // Crea una instancia de FirebaseServices
+  final firebaseServices = FirebaseServices();
 
   @override
   void initState() {
     super.initState();
-    _loadDataFuture = loadData(); // Cargar los datos al iniciar
+    _loadDataFuture = loadData();
   }
 
   Future<void> loadData() async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    await userProvider.loadUserData(); // Llama a la carga de datos del usuario
+    await userProvider.loadUserData();
   }
 
   @override

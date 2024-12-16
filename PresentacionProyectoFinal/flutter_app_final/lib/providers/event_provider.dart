@@ -18,27 +18,25 @@ class EventProvider with ChangeNotifier {
   List<Event> _events = [];
   Map<String, Map<DateTime, List<Event>>> _userEvents = {};
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final UserProvider _userProvider =
-      UserProvider(); // O accede a través de provider
+  final UserProvider _userProvider = UserProvider();
   String? _userId;
   List<Event> get events => _events;
 
   EventProvider() {
-    loadEvents(); // Cargar eventos al inicializar
-    _loadOccupiedTeams(); // Cargar equipos ocupados al inicializar
+    loadEvents();
+    _loadOccupiedTeams();
   }
 
   void setUserId(String userId) {
     _userId = userId;
     print(' UID asignado en Provider: $_userId');
-    fetchUserEventsFromFirebase(); // Llamar para obtener los eventos del usuario
+    fetchUserEventsFromFirebase();
   }
 
   // Método para obtener todos los eventos de Firebase
   Future<void> fetchEvents({bool isAdmin = false}) async {
     try {
       if (isAdmin) {
-        // Obtener todos los eventos de todos los usuarios para el admin
         final querySnapshot =
             await FirebaseFirestore.instance.collection('events').get();
         if (querySnapshot.docs.isEmpty) {
@@ -51,7 +49,7 @@ class EventProvider with ChangeNotifier {
         }
       } else {
         final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-        // Obtener eventos del usuario actual
+
         final querySnapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(userId)
@@ -72,7 +70,6 @@ class EventProvider with ChangeNotifier {
     }
   }
 
-  // Agrupar eventos por fecha
   Map<DateTime, List<Event>> _groupEventsByDate(List<Event> events) {
     final Map<DateTime, List<Event>> groupedEvents = {};
     for (var event in events) {
@@ -140,15 +137,14 @@ class EventProvider with ChangeNotifier {
       final startOfDay = DateTime.utc(day.year, day.month, day.day);
       final endOfDay = startOfDay
           .add(const Duration(days: 1))
-          .subtract(Duration(seconds: 1)); // Hasta el final del día
+          .subtract(Duration(seconds: 1));
 
       final eventsForDay = <Event>[];
 
-      // Verificar si el usuario está autenticado
       String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
       if (userId.isEmpty) {
         print("Usuario no autenticado");
-        return []; // Retorna una lista vacía si el usuario no está autenticado
+        return [];
       }
 
       if (isAdmin) {
@@ -181,7 +177,6 @@ class EventProvider with ChangeNotifier {
           eventsForDay.add(Event.fromFirestore(eventDoc));
         }
       }
-
       return eventsForDay;
     } catch (e) {
       print("Error al obtener eventos: $e");
@@ -194,8 +189,6 @@ class EventProvider with ChangeNotifier {
       BuildContext context, Event oldEvent, Event updatedEvent) async {
     try {
       await _firebaseServices.updateEvent(oldEvent, updatedEvent, context);
-
-      // Refrescar eventos locales desde Firebase
       await fetchUserEventsFromFirebase();
     } catch (e) {
       print("Error al editar evento: $e");
@@ -205,13 +198,11 @@ class EventProvider with ChangeNotifier {
   // Método para agregar un evento en EventProvider
   Future<void> addEvent(BuildContext context, Event event) async {
     try {
-      // Generar un ID único y asegurarse de que se use siempre el mismo
       if (event.id.isEmpty) {
         var uuid = Uuid();
-        event.id = uuid.v4(); // Generar UUID en lugar de usar .doc().id
+        event.id = uuid.v4();
       }
 
-      // Validar datos del evento
       if (event.title.isEmpty ||
           event.userId.isEmpty ||
           event.equipment.isEmpty) {
@@ -219,12 +210,11 @@ class EventProvider with ChangeNotifier {
         return;
       }
 
-      // Llamar al EquipmentProvider y pasar el ID del evento
       final equipmentProvider =
           Provider.of<EquipmentProvider>(context, listen: false);
       final success = await equipmentProvider.reserveEquipment(
         event.equipment,
-        event.date.toIso8601String(), // Formato ISO con precisión
+        event.date.toIso8601String(),
         event.userId,
         event.title,
         event.startTime,
@@ -232,7 +222,7 @@ class EventProvider with ChangeNotifier {
         event.color,
         event.data ?? '',
         context,
-        event.id, // Se pasa el ID aquí
+        event.id,
       );
 
       if (!success) {
@@ -266,14 +256,11 @@ class EventProvider with ChangeNotifier {
       final firebaseServices = FirebaseServices();
       await firebaseServices.deleteEvent(event.userId, event);
 
-      // Eliminar el evento de la lista local
       final dateOnly = DateTime(date.year, date.month, date.day);
       _userEvents[event.userId]?[dateOnly]
           ?.removeWhere((e) => e.id == event.id);
 
-      // Notificar a los widgets dependientes que los eventos han cambiado
       notifyListeners();
-      // Recargar eventos desde Firebase para sincronizar
       await fetchUserEventsFromFirebase();
     } catch (e) {
       print('Error al eliminar evento: $e');
@@ -289,14 +276,9 @@ class EventProvider with ChangeNotifier {
         print("Error: Usuario no autenticado.");
         return;
       }
-
-      // Espera los eventos antes de proceder
-      await fetchEvents(); // Asegúrate de que los eventos están cargados
-
-      // Limpiar eventos previos
+      await fetchEvents();
       _userEvents.clear();
 
-      // Iterar sobre los eventos si no están vacíos
       if (_events.isNotEmpty) {
         for (var event in _events) {
           final dateOnly =
@@ -318,10 +300,8 @@ class EventProvider with ChangeNotifier {
   }
 
   // Verificar si el equipo está disponible para una fecha específica
-  // Verificar si el equipo está disponible para una fecha y hora específica
   bool isTeamAvailable(String equipmentName, DateTime selectedDate,
       TimeOfDay startTime, TimeOfDay endTime) {
-    // Convertir los TimeOfDay a DateTime para comparación con los eventos
     DateTime startDateTime = DateTime(
       selectedDate.year,
       selectedDate.month,
@@ -338,7 +318,6 @@ class EventProvider with ChangeNotifier {
       endTime.minute,
     );
 
-    // Verificar eventos en el día seleccionado
     for (var userEvents in _userEvents.values) {
       if (userEvents[selectedDate] != null) {
         for (var event in userEvents[selectedDate]!) {
@@ -359,21 +338,19 @@ class EventProvider with ChangeNotifier {
               event.endTime.minute,
             );
 
-            // Verificar si hay solapamiento de horarios
             if ((startDateTime.isBefore(eventEndTime) &&
                     endDateTime.isAfter(eventStartTime)) ||
                 startDateTime.isAtSameMomentAs(eventStartTime) ||
                 endDateTime.isAtSameMomentAs(eventEndTime)) {
-              return false; // El equipo no está disponible
+              return false;
             }
           }
         }
       }
     }
-    return true; // El equipo está disponible
+    return true;
   }
 
-  // Método para cargar equipos ocupados desde Firebase
   Future<void> _loadOccupiedTeams() async {
     try {
       _occupiedTeams = await _firebaseServices.getOccupiedTeams();
@@ -382,7 +359,6 @@ class EventProvider with ChangeNotifier {
     }
   }
 
-  // Método para guardar equipos ocupados en Firebase
   Future<void> _saveOccupiedTeams() async {
     try {
       await _firebaseServices.saveOccupiedTeams(_occupiedTeams);
@@ -393,15 +369,12 @@ class EventProvider with ChangeNotifier {
 
 // Método para obtener todos los eventos de todos los usuarios (solo para admin)
   Future<List<Map<String, dynamic>>> fetchAllEventsForAdmin() async {
-    // Asegúrate de que el usuario tiene el rol de administrador
     var currentUser = FirebaseAuth.instance.currentUser;
     var doc = await _firestore.collection('users').doc(currentUser?.uid).get();
     if (doc.exists && doc.data()?['isAdmin'] == true) {
-      // El administrador puede obtener todos los eventos
       var querySnapshot = await _firestore.collection('events').get();
       return querySnapshot.docs.map((e) => e.data()).toList();
     } else {
-      // No tiene permisos, puedes lanzar un error o devolver una lista vacía
       return [];
     }
   }

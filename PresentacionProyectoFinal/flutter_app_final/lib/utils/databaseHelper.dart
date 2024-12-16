@@ -61,12 +61,10 @@ class DatabaseHelper {
         FOREIGN KEY (userId) REFERENCES users(id)
     )''');
 
-    // Insertar equipos y usuarios iniciales
     await _insertInitialData(db);
   }
 
   Future<void> _insertInitialData(Database db) async {
-    // Equipos iniciales
     await db.insert('equipment', {'nameE': 'GPS SOUTH', 'reservedDates': ''});
     await db
         .insert('equipment', {'nameE': 'GPS HEMISPHERE', 'reservedDates': ''});
@@ -113,13 +111,11 @@ class DatabaseHelper {
   Future<void> syncDataToFirebase() async {
     final db = await database;
 
-    // Obtenemos todos los usuarios de SQLite
     List<Map<String, dynamic>> users = await db.query('users');
 
     for (var user in users) {
       String email = user['email'];
 
-      // Consulta para encontrar el UID correspondiente en Firebase
       var querySnapshot = await _firestore
           .collection('users')
           .where('email', isEqualTo: email)
@@ -128,7 +124,6 @@ class DatabaseHelper {
       if (querySnapshot.docs.isNotEmpty) {
         String uid = querySnapshot.docs.first.id;
 
-        // Sincroniza el usuario en Firebase
         await _firestore.collection('users').doc(uid).set({
           'name': user['name'],
           'email': user['email'],
@@ -136,12 +131,10 @@ class DatabaseHelper {
           'isAdmin': user['isAdmin'],
         });
 
-        // Sincronizar los eventos para cada usuario
         List<Map<String, dynamic>> events = await db
             .query('events', where: 'userId = ?', whereArgs: [user['id']]);
 
         for (var event in events) {
-          // Asegúrate de que el evento se sincronice en la subcolección 'events' del usuario
           await _firestore
               .collection('users')
               .doc(uid)
@@ -149,14 +142,10 @@ class DatabaseHelper {
               .doc(event['id'].toString())
               .set(event);
 
-          // También sincronizar en la colección principal de eventos
           await _firestore
               .collection('events')
               .doc(event['id'].toString())
-              .set({
-            ...event,
-            'userId': uid // Relacionar con el UID correcto
-          });
+              .set({...event, 'userId': uid});
         }
       } else {
         print('No se encontró UID para el usuario con email: ${user['email']}');
@@ -173,21 +162,17 @@ class DatabaseHelper {
       String date) async {
     final db = await database;
 
-    // Obtener los eventos reservados para la fecha específica
     final reservedEquipments = await db.query(
       'events',
       where: 'date = ?',
       whereArgs: [date],
     );
 
-    // Crear un conjunto de IDs de equipos reservados
     Set<int> reservedIds =
         reservedEquipments.map((event) => event['equipmentId'] as int).toSet();
 
-    // Obtener todos los equipos
     final allEquipments = await db.query('equipment');
 
-    // Filtrar los equipos reservados
     return allEquipments
         .where((equipment) => !reservedIds.contains(equipment['id']))
         .toList();
@@ -202,7 +187,6 @@ class DatabaseHelper {
   ) async {
     final db = await database;
 
-    // Comprobar si ya hay una reserva para el equipo en la fecha y el rango de tiempo especificados
     final reservedEvents = await db.query(
       'events',
       where: 'equipmentId = ? AND date = ?',
@@ -222,11 +206,10 @@ class DatabaseHelper {
               startTime.minute < eventEndTime.minute) ||
           (endTime.hour == eventStartTime.hour &&
               endTime.minute > eventStartTime.minute)) {
-        return false; // Ya reservado en este rango de tiempo
+        return false;
       }
     }
 
-    // Si no hay conflictos, guarda la nueva reserva
     final List<Map<String, dynamic>> equipmentData = await db.query(
       'equipment',
       where: 'id = ?',
@@ -238,10 +221,9 @@ class DatabaseHelper {
       Set<String> reservedDatesSet =
           reservedDates.isEmpty ? {} : reservedDates.split(',').toSet();
 
-      reservedDatesSet.add('$date-$userId'); // Formato "fecha-userId"
+      reservedDatesSet.add('$date-$userId');
       String updatedDates = reservedDatesSet.join(',');
 
-      // Guardar la nueva reserva en la tabla de eventos
       await db.insert('events', {
         'equipmentId': equipmentId,
         'date': date,
@@ -390,7 +372,7 @@ class DatabaseHelper {
     if (result.isNotEmpty) {
       return result.first['name'] as String;
     }
-    return 'Usuario no encontrado'; // Proporcionar un valor por defecto
+    return 'Usuario no encontrado';
   }
 
   Future<List<Map<String, dynamic>>> fetchEventsWithUserDetails(
@@ -410,7 +392,7 @@ class DatabaseHelper {
       String date) async {
     final db = await database;
 
-    print('Buscando detalles para la fecha: $date'); // Añadir este print
+    print('Buscando detalles para la fecha: $date');
 
     final List<Map<String, dynamic>> results = await db.rawQuery('''
   SELECT users.name, equipment.nameE, events.date, events.startTime, events.endTime
@@ -446,24 +428,21 @@ class DatabaseHelper {
   Future<int> updateEvent(Event event) async {
     final db = await database;
 
-    // Convierte la hora de inicio y fin a formato de String
     String startTime =
         DateTime(0, 0, 0, event.startTime.hour, event.startTime.minute)
             .toIso8601String();
     String endTime = DateTime(0, 0, 0, event.endTime.hour, event.endTime.minute)
         .toIso8601String();
 
-    // Actualiza el evento en la tabla 'events'
     return await db.update(
       'events',
       {
-        'name': event
-            .title, // Mapea `title` a `name`, ya que la columna `name` existe
+        'name': event.title,
         'date': event.date.toIso8601String(),
         'startTime': startTime,
         'endTime': endTime,
         'userId': event.userId,
-        'nameE': event.equipment, // Mapea `equipment` a `nameE`
+        'nameE': event.equipment,
       },
       where: 'id = ?',
       whereArgs: [event.id],

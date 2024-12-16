@@ -52,17 +52,16 @@ class _CalendarPageState extends State<CalendarPage> {
   DateTime _selectedDate = DateTime.now();
   List<Event> events = [];
   Map<DateTime, List<Event>> eventsByDay = {};
-  List<Event> allEvents = []; // Lista de todos los eventos
-  // Mapa de eventos agrupados por día
+  List<Event> allEvents = [];
 
   @override
   void initState() {
     super.initState();
     _selectedDay = DateTime.now();
-    _loadUserName(); // Cargar los eventos al iniciar// Inicializamos la lista de eventos
+    _loadUserName();
     _loadInitialData();
     _loadSelectedEvents(_focusedDay);
-    _loadAllEvents(); // Asegurarse de cargar todos los eventos al inicio
+    _loadAllEvents();
     Provider.of<EventProvider>(context, listen: false).loadEvents();
   }
 
@@ -97,11 +96,11 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Future<void> _loadAllEvents() async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final userId = userProvider.userId; // Obtener el userId desde UserProvider
+    final userId = userProvider.userId;
 
     if (userId != null) {
-      final List<Event> fetchedEvents = await FirebaseServices()
-          .getAllEvents(userId); // Obtener los eventos de Firestore
+      final List<Event> fetchedEvents =
+          await FirebaseServices().getAllEvents(userId);
 
       setState(() {
         allEvents = fetchedEvents;
@@ -326,7 +325,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Future<String?> _getUserId() async {
     final user = FirebaseAuth.instance.currentUser;
-    return user?.uid; // Devuelve el UID del usuario logueado
+    return user?.uid;
   }
 
   Future<List<Event>> _getEventsForSelectedDay(
@@ -338,13 +337,13 @@ class _CalendarPageState extends State<CalendarPage> {
         isAdmin: isAdmin,
       );
     } else {
-      // Obtener el userId desde Firebase Authentication (o de donde corresponda)
+      // Obtener el userId desde Firebase Authentication
       final userId = await _getUserId();
       if (userId != null && _selectedDate != null) {
         return eventProvider.getEventsForDay(_selectedDate, userId);
       }
     }
-    return []; // Devuelve una lista vacía si no se cumple ninguna condición
+    return [];
   }
 
   void _editEvent(BuildContext context, Event event) async {
@@ -362,7 +361,7 @@ class _CalendarPageState extends State<CalendarPage> {
       (e) => e.nameE == event.equipment,
       orElse: () {
         throw Exception('Equipo no encontrado');
-      }, // Si no se encuentra, return null
+      },
     );
 
     String eventType = event.title;
@@ -479,7 +478,6 @@ class _CalendarPageState extends State<CalendarPage> {
   void _deleteEvent(Event event) {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
 
-    // Mostrar diálogo de confirmación
     showDialog(
       context: context,
       builder: (BuildContext context) => AlertDialog(
@@ -500,7 +498,7 @@ class _CalendarPageState extends State<CalendarPage> {
             onPressed: () async {
               try {
                 await eventProvider.deleteEvent(context, event.date, event);
-                Navigator.of(context).pop(); // Cerrar diálogo
+                Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                       content: Text('Evento eliminado exitosamente')),
@@ -522,7 +520,7 @@ class _CalendarPageState extends State<CalendarPage> {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
     final equipmentProvider =
         Provider.of<EquipmentProvider>(context, listen: false);
-    Color selectedColor = Colors.blue; // Valor inicial
+    Color selectedColor = Colors.blue;
     TimeOfDay? startTime;
     TimeOfDay? endTime;
     Equipment? selectedEquipment;
@@ -551,7 +549,6 @@ class _CalendarPageState extends State<CalendarPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Tipo de evento
                   DropdownButton<String>(
                     value: eventType,
                     items: const [
@@ -568,7 +565,6 @@ class _CalendarPageState extends State<CalendarPage> {
                       }
                     },
                   ),
-                  // Selección de color
                   DropdownButton<Color>(
                     value: selectedColor,
                     items: const [
@@ -596,7 +592,6 @@ class _CalendarPageState extends State<CalendarPage> {
                       }
                     },
                   ),
-                  // Selección del equipo
                   EquipmentWidget(
                     selectedEquipment: selectedEquipment,
                     equipmentList: equipmentProvider.equipmentList,
@@ -610,7 +605,6 @@ class _CalendarPageState extends State<CalendarPage> {
                     endTime: endTime ?? TimeOfDay.now(),
                     userId: userId,
                   ),
-                  // Selección de hora de inicio
                   ListTile(
                     title: const Text('Hora de Inicio'),
                     trailing:
@@ -627,7 +621,6 @@ class _CalendarPageState extends State<CalendarPage> {
                       }
                     },
                   ),
-                  // Selección de hora de fin
                   ListTile(
                     title: const Text('Hora de Fin'),
                     trailing:
@@ -680,12 +673,11 @@ class _CalendarPageState extends State<CalendarPage> {
                     return;
                   }
 
-                  // Verifica si el equipo está disponible
+                  // Verificar si el equipo está disponible
                   bool isAvailable =
                       await equipmentProvider.checkEquipmentAvailability(
                     selectedEquipment!.id.toString(),
-                    (_selectedDay ?? _focusedDay)
-                        .toIso8601String(), // Mantener formato ISO completo
+                    (_selectedDay ?? _focusedDay).toIso8601String(),
                   );
 
                   if (!isAvailable) {
@@ -726,14 +718,12 @@ class _CalendarPageState extends State<CalendarPage> {
   Future<void> _loadEvents(DateTime day) async {
     final eventProvider = Provider.of<EventProvider>(context, listen: false);
     if (isAdmin) {
-      // Si es admin, carga todos los eventos del día
       events = await eventProvider.getAllEventsForDay(day);
     } else {
-      // Si no es admin, carga solo los eventos del usuario
       if (_userId != null) {
         events = await eventProvider.getEventsForDay(day, _userId!);
       }
     }
-    setState(() {}); // Actualizar la interfaz con los nuevos eventos
+    setState(() {});
   }
 }

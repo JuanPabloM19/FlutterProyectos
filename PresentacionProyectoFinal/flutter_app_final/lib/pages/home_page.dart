@@ -10,9 +10,9 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        backgroundColor: const Color(0xFF010618), // Fondo de la página
+        backgroundColor: const Color(0xFF010618),
         body: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // Centra verticalmente
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               alignment: Alignment.topCenter,
@@ -24,7 +24,7 @@ class HomePage extends StatelessWidget {
               style: TextStyle(
                 fontSize: 60.0,
                 fontWeight: FontWeight.bold,
-                color: Colors.white, // Letras blancas
+                color: Colors.white,
                 fontFamily: 'Montserrat',
               ),
             ),
@@ -32,7 +32,7 @@ class HomePage extends StatelessWidget {
               height: 200.0,
             ),
             SizedBox(
-              width: 350.0, // Ancho del botón
+              width: 350.0,
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.push(
@@ -41,16 +41,16 @@ class HomePage extends StatelessWidget {
                   );
                 },
                 style: ButtonStyle(
-                  backgroundColor: MaterialStateProperty.all<Color>(
-                      const Color(0xFF80B3FF)), // Color de fondo del botón
+                  backgroundColor:
+                      MaterialStateProperty.all<Color>(const Color(0xFF80B3FF)),
                   elevation: MaterialStateProperty.all<double>(10.0),
                   shape: MaterialStateProperty.all<OutlinedBorder>(
                     RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20.0),
                     ),
                   ),
-                  foregroundColor: MaterialStateProperty.all<Color>(
-                      const Color(0xFF010618)), // Color del texto del botón
+                  foregroundColor:
+                      MaterialStateProperty.all<Color>(const Color(0xFF010618)),
                 ),
                 child: const Text(
                   'Iniciar Sesión',

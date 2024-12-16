@@ -10,7 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class MainPage extends StatefulWidget {
   final bool isAdmin;
   const MainPage({Key? key, required this.isAdmin})
-      : super(key: key); // Se recibe isAdmin
+      : super(key: key); // isAdmin
 
   @override
   _MainPageState createState() => _MainPageState();
@@ -60,4 +60,3 @@ class _MainPageState extends State<MainPage> {
     );
   }
 }
-  

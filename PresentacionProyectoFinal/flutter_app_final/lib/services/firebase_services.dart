@@ -12,7 +12,6 @@ class FirebaseServices {
   // Obtener todos los equipos de Firestore y sincronizarlos con SQLite
   Future<List<Map<String, dynamic>>> getAllEquipment() async {
     try {
-      // Obtener equipos desde Firestore
       QuerySnapshot querySnapshot =
           await _firestore.collection('equipment').get();
       List<Map<String, dynamic>> equipmentList = querySnapshot.docs
@@ -34,7 +33,6 @@ class FirebaseServices {
 // Método para eliminar un evento
   Future<void> deleteEvent(String userId, Event event) async {
     try {
-      // Ruta correcta según tu estructura
       await _firestore
           .collection('users')
           .doc(userId)
@@ -55,13 +53,11 @@ class FirebaseServices {
           "El ID del evento está vacío. Verifica que se haya asignado correctamente.");
     }
 
-    // Asegurarse de que el userId esté presente
     if (event.userId.isEmpty) {
       throw Exception(
           "El ID del usuario está vacío. No se puede encontrar la ruta del evento.");
     }
 
-    // Referenciar la ruta correcta en Firestore
     final docRef = _firestore
         .collection('users')
         .doc(event.userId)
@@ -74,11 +70,9 @@ class FirebaseServices {
       throw Exception("No se encontró el documento con ID: ${event.id}");
     }
 
-    // Actualizamos el evento en Firestore
     await docRef.update(updatedEvent.toJson());
     print('Evento actualizado exitosamente en Firestore');
 
-    // Actualizamos el evento en la base de datos local
     final result = await _dbHelper.updateEvent(updatedEvent);
     if (result > 0) {
       print('Evento actualizado exitosamente en SQLite');
@@ -91,7 +85,6 @@ class FirebaseServices {
   Future<List<Map<String, dynamic>>> fetchAvailableEquipments(
       String date) async {
     try {
-      // Obtener todos los equipos de Firestore
       QuerySnapshot allEquipmentsSnapshot =
           await _firestore.collection('equipment').get();
 
@@ -105,7 +98,7 @@ class FirebaseServices {
             : [];
 
         // Verificar si la fecha está reservada
-        return !reservedDates.contains(date); // Solo verifica la fecha
+        return !reservedDates.contains(date);
       }).toList();
 
       return availableEquipments;
@@ -115,8 +108,6 @@ class FirebaseServices {
     }
   }
 
-  // Reservar un equipo en Firestore y validarlo
-  // Reservar un equipo en Firestore y validarlo
   // Reservar un equipo en Firestore
   Future<bool> reserveEquipment(
     int equipmentId,
@@ -131,11 +122,9 @@ class FirebaseServices {
   ) async {
     try {
       await _firestore.runTransaction((transaction) async {
-        // Referencia al equipo
         DocumentReference equipmentRef =
             _firestore.collection('equipment').doc(equipmentId.toString());
 
-        // Obtener los datos del equipo
         DocumentSnapshot equipmentSnapshot =
             await transaction.get(equipmentRef);
 
@@ -146,7 +135,6 @@ class FirebaseServices {
         Map<String, dynamic> equipmentData =
             equipmentSnapshot.data() as Map<String, dynamic>;
 
-        // Obtener las fechas de reserva del equipo
         List<String> reservedDates =
             List<String>.from(equipmentData['reservedDates'] ?? []);
 
@@ -155,13 +143,10 @@ class FirebaseServices {
           throw Exception("El equipo ya está reservado para esta fecha.");
         }
 
-        // Si no hay conflictos, actualizar la fecha de la reserva
         transaction.update(equipmentRef, {
-          'reservedDates':
-              FieldValue.arrayUnion([date]) // Añadimos la fecha como reservada
+          'reservedDates': FieldValue.arrayUnion([date])
         });
 
-        // Crear el evento en la subcolección de eventos del usuario
         String eventId = _firestore
             .collection('users')
             .doc(userId)
@@ -189,10 +174,10 @@ class FirebaseServices {
         transaction.set(eventRef, newEvent.toJson());
       });
 
-      return true; // La reserva fue exitosa
+      return true;
     } catch (e) {
       print("Error al reservar equipo: $e");
-      return false; // Si hubo algún error, devolvemos false
+      return false;
     }
   }
 
@@ -229,7 +214,6 @@ class FirebaseServices {
       for (var eventDoc in eventsSnapshot.docs) {
         var event = eventDoc.data() as Map<String, dynamic>;
 
-        // Obtener el usuario y equipo relacionados con el evento
         var userDoc = await _firestore
             .collection('users')
             .doc(event['userId'].toString())
@@ -295,7 +279,7 @@ class FirebaseServices {
         .get();
 
     if (querySnapshot.docs.isEmpty) {
-      return null; // Si no existe el usuario, retornamos null
+      return null;
     } else {
       return querySnapshot.docs.first.data() as Map<String, dynamic>;
     }
@@ -309,7 +293,6 @@ class FirebaseServices {
         return;
       }
 
-      // Referencia a la subcolección de eventos del usuario
       CollectionReference userEventsRef =
           _firestore.collection('users').doc(userId).collection('events');
 
@@ -318,7 +301,7 @@ class FirebaseServices {
 
       for (var event in events) {
         if (event.id.isEmpty) {
-          event.id = userEventsRef.doc().id; // Generar un nuevo ID
+          event.id = userEventsRef.doc().id;
         }
 
         batch.set(userEventsRef.doc(event.id), event.toJson());
@@ -347,7 +330,7 @@ class FirebaseServices {
 
       final List<Event> events = snapshot.docs.map((doc) {
         print("Evento encontrado: ${doc.data()}");
-        return Event.fromFirestore(doc); // Usar fromFirestore aquí
+        return Event.fromFirestore(doc);
       }).toList();
 
       return events;
@@ -381,18 +364,15 @@ class FirebaseServices {
   Future<void> saveOccupiedTeams(
       Map<DateTime, List<String>> occupiedTeams) async {
     try {
-      // Referencia a la colección de equipos ocupados
       CollectionReference occupiedTeamsRef =
           _firestore.collection('occupied_teams');
 
-      // Limpiar equipos ocupados antes de agregar los nuevos
       WriteBatch batch = _firestore.batch();
       QuerySnapshot querySnapshot = await occupiedTeamsRef.get();
       for (var doc in querySnapshot.docs) {
-        batch.delete(doc.reference); // Eliminar equipos ocupados antiguos
+        batch.delete(doc.reference);
       }
 
-      // Agregar los equipos ocupados nuevos
       occupiedTeams.forEach((date, teams) {
         batch.set(
           occupiedTeamsRef.doc(date.toIso8601String()),
@@ -400,7 +380,6 @@ class FirebaseServices {
         );
       });
 
-      // Commit de la transacción
       await batch.commit();
     } catch (e) {
       print("Error al guardar equipos ocupados: $e");
@@ -410,7 +389,6 @@ class FirebaseServices {
   // Método para obtener el nombre del usuario por ID
   Future<String?> getUserNameById(String userId) async {
     try {
-      // Accede al documento del usuario en la colección 'users'
       DocumentSnapshot snapshot =
           await _firestore.collection('users').doc(userId).get();
 
@@ -461,11 +439,11 @@ class FirebaseServices {
                 return Event.fromFirestore(eventDoc);
               } catch (e) {
                 print('Error al convertir evento para el usuario $userId: $e');
-                return null; // Se puede ignorar el evento incorrecto
+                return null;
               }
             })
             .whereType<Event>()
-            .toList(); // Ignora los nulos
+            .toList();
       }
 
       print("Eventos cargados para el usuario $userId: ${userEvents.length}");
@@ -480,30 +458,25 @@ class FirebaseServices {
   Future<List<Event>> getAllAdminEvents() async {
     List<Event> allEvents = [];
     try {
-      // Obtener todos los usuarios
       QuerySnapshot usersSnapshot = await _firestore.collection('users').get();
 
-      // Recolectar todos los eventos para cada usuario
       List<Future<List<Event>>> eventFutures =
           usersSnapshot.docs.map((userDoc) async {
         var eventsRef = userDoc.reference.collection('events');
         QuerySnapshot eventsSnapshot = await eventsRef.get();
 
-        // Convertir los documentos a eventos de tipo Event
         return eventsSnapshot.docs.map((eventDoc) {
           return Event.fromFirestore(eventDoc);
-        }).toList(); // Devolver como lista de Event
+        }).toList();
       }).toList();
 
-      // Esperar a que todas las llamadas asíncronas terminen
       List<List<Event>> allUsersEvents = await Future.wait(eventFutures);
 
-      // Aplanar la lista de listas en una lista plana
       allEvents = allUsersEvents.expand((events) => events).toList();
     } catch (e) {
       print("Error al obtener eventos para administrador: $e");
     }
-    return allEvents; // Asegúrate de que la lista devuelta es de tipo List<Event>
+    return allEvents;
   }
 
   Future<bool> checkIfUserIsAdmin(String userId) async {
@@ -511,7 +484,7 @@ class FirebaseServices {
       final idTokenResult =
           await FirebaseAuth.instance.currentUser!.getIdTokenResult(true);
       final claims = idTokenResult.claims;
-      final isAdmin = claims?['admin'] == true; // Verificar el claim 'admin'
+      final isAdmin = claims?['admin'] == true;
       print("El usuario con UID: $userId es Admin? $isAdmin");
       return isAdmin;
     } catch (e) {
@@ -533,7 +506,7 @@ class FirebaseServices {
               return Event.fromFirestore(doc);
             } catch (e) {
               print('Error al convertir evento: $e');
-              return null; // Retorna null si no se puede convertir
+              return null;
             }
           })
           .where((event) => event != null)
@@ -542,7 +515,7 @@ class FirebaseServices {
 
       print('Total de eventos convertidos: ${allEvents.length}');
 
-      // **FILTRO DE LA SEMANA ACTUAL**
+      // FILTRO DE LA SEMANA ACTUAL
       List<DateTime> weekDates = getWeekDates();
       DateTime startDate = weekDates.first;
       DateTime endDate = weekDates.last;

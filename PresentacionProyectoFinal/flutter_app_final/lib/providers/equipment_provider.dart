@@ -46,7 +46,7 @@ class EquipmentProvider with ChangeNotifier {
     Color color,
     String data,
     BuildContext context,
-    String eventId, // Recibe el ID del evento
+    String eventId,
   ) async {
     try {
       await _firestore.runTransaction((transaction) async {
@@ -81,11 +81,9 @@ class EquipmentProvider with ChangeNotifier {
           'reservedDates': FieldValue.arrayUnion([date])
         });
 
-        // Formatear la fecha correctamente
         DateTime parsedDate = DateTime.parse(date);
         String formattedDate = parsedDate.toIso8601String();
 
-        // Crear nuevo evento con el mismo ID generado al inicio
         Event newEvent = Event(
           id: eventId, // Usar el ID proporcionado, no generarlo de nuevo
           title: title,
@@ -102,7 +100,7 @@ class EquipmentProvider with ChangeNotifier {
             .collection('users')
             .doc(userId)
             .collection('events')
-            .doc(eventId); // Usar el ID aquí
+            .doc(eventId);
 
         transaction.set(eventRef, newEvent.toJson());
       });
@@ -120,7 +118,6 @@ class EquipmentProvider with ChangeNotifier {
     }
   }
 
-  // Función para verificar la disponibilidad de un equipo en una fecha y hora específica
   Future<bool> checkEquipmentAvailability(
       String equipmentId, String date) async {
     try {
@@ -138,16 +135,13 @@ class EquipmentProvider with ChangeNotifier {
           ? List<String>.from(reservedDatesData)
           : [];
 
-      // Verificar si la fecha está reservada
-      return !reservedDates
-          .contains(date); // True si está disponible, False si está reservada
+      return !reservedDates.contains(date);
     } catch (e) {
       print("Error al verificar disponibilidad: $e");
       return false;
     }
   }
 
-  // Método para liberar equipo
   Future<void> freeEquipment(int equipmentId, String date) async {
     await DatabaseHelper().freeEquipment(equipmentId, date);
     await fetchEquipments();

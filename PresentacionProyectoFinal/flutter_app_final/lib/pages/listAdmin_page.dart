@@ -17,17 +17,16 @@ class RentalListPage extends StatefulWidget {
 class _RentalListPageState extends State<RentalListPage> {
   bool _isLoading = true;
   String _errorMessage = '';
-  Map<DateTime, List<Event>> _eventsByDay = {}; // Agrupar los eventos por día
+  Map<DateTime, List<Event>> _eventsByDay = {};
 
   @override
   void initState() {
     super.initState();
-    _loadData(); // Cargar datos al iniciar
+    _loadData();
   }
 
   Future<Map<String, dynamic>> getUserDetails(String userId) async {
     try {
-      // Obtener el documento 'name' desde la subcolección 'name'
       QuerySnapshot nameSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
@@ -35,7 +34,6 @@ class _RentalListPageState extends State<RentalListPage> {
           .limit(1)
           .get();
 
-      // Obtener el documento 'email' desde la subcolección 'email'
       QuerySnapshot emailSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
@@ -225,7 +223,6 @@ class _RentalListPageState extends State<RentalListPage> {
           children: [
             FloatingActionButton(
               onPressed: () {
-                // Navegar a TodayPage
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const CalendarPage()),
